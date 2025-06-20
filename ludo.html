@@ -128,6 +128,7 @@
             width: 280px;
             border: 1px solid rgba(255,255,255,0.1);
             backdrop-filter: blur(10px); box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            perspective: 800px;
         }
         #status { font-size: 1.2em; text-align: center; min-height: 50px; margin-bottom: 20px; }
         #dice {
@@ -135,9 +136,10 @@
             display: flex; justify-content: center; align-items: center;
             font-size: 3em; color: #333; cursor: pointer; border: 4px solid transparent;
             transition: transform 0.3s, border-color 0.3s; box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+            transform-style: preserve-3d;
         }
         #dice.active { border-color: var(--current-player-color); animation: jiggle 0.5s; }
-        #dice.rolling { animation: dice-spin 0.5s; }
+        #dice.rolling { animation: roll-dice-animation 0.5s ease-out; }
 
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .modal-content {
@@ -182,7 +184,14 @@
             0%, 100% { transform: scale(1); box-shadow: 0 4px 8px rgba(0,0,0,0.5), 0 0 0 0px var(--current-player-color-glow); }
             50% { transform: scale(1.1); box-shadow: 0 6px 12px rgba(0,0,0,0.4), 0 0 15px 5px var(--current-player-color-glow); }
         }
-        @keyframes dice-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes roll-dice-animation {
+            0% { transform: scale(1.2) rotate3d(0, 0, 0, 0deg); }
+            20% { transform: scale(1.2) rotate3d(0.5, 0.8, 0.1, 100deg); }
+            40% { transform: scale(1.2) rotate3d(0.1, 0.2, 0.7, 200deg); }
+            60% { transform: scale(1.2) rotate3d(0.9, 0.1, 0.3, 300deg); }
+            80% { transform: scale(1.2) rotate3d(0.7, 0.3, 0.8, 400deg); }
+            100% { transform: scale(1) rotate3d(0, 0, 0, 0deg); }
+        }
         @keyframes jiggle {
             0%, 100% { transform: scale(1) rotate(0deg); }
             25% { transform: scale(1.05) rotate(-5deg); }
@@ -277,7 +286,7 @@
             const PATH_DATA = {
                 PATH_COORDS: [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[7,0],[6,0]],
                 FINISH_PATH_COORDS: {red:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],green:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],yellow:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],blue:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]},
-                START_POSITIONS: { red: 0, green: 13, yellow: 26, blue: 39 },
+                START_POSITIONS: { red: 0, green: 13, yellow: 25, blue: 38 }, // CORRECTED
                 HOME_SPOTS: {red:[[1,1],[1,4],[4,1],[4,4]],green:[[1,10],[1,13],[4,10],[4,13]],yellow:[[10,10],[10,13],[13,10],[13,13]],blue:[[10,1],[10,4],[13,1],[13,4]]}
             };
             
@@ -496,7 +505,16 @@
                 diceEl.classList.add('rolling');
                 gameState.diceRolled = true;
                 gameState.isAnimating = true;
-                await sleep(400);
+                
+                const rollDuration = 500; // Must match CSS animation duration
+                const numberFlipper = setInterval(() => {
+                    diceEl.innerText = Math.floor(Math.random() * 6) + 1;
+                }, 60);
+
+                await sleep(rollDuration);
+
+                clearInterval(numberFlipper);
+                
                 gameState.diceValue = Math.floor(Math.random() * 6) + 1;
                 diceEl.innerText = gameState.diceValue;
                 diceEl.classList.remove('rolling');
