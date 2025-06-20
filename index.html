@@ -103,17 +103,19 @@
 
     <main class="games-grid">
         <a href="asteroid_game.html" class="game-card">
-            <!-- You can create a small thumbnail image for your game -->
-            <!-- For now, a placeholder or a simple background -->
-            <img src="asteroid_game_thumbnail.png" alt="Asteroid Dodge Game Thumbnail" class="thumbnail" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#333';">
-            <!-- Or if you don't have a thumbnail yet:
-            <div class="thumbnail-placeholder" style="width:100%; height:180px; background-color:#333; display:flex; align-items:center; justify-content:center; border-bottom: 2px solid #4ecdc4;">
-                <span style="color:#fff; font-size:1.2em;">Asteroid Dodge</span>
-            </div>
-            -->
+            <img src="asteroid_game_thumbnail.png" alt="Asteroid Dodge Game Thumbnail" class="thumbnail" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#333'; this.parentElement.insertAdjacentHTML('afterbegin', '<div style=\'width:100%; height:180px; background-color:#333; display:flex; align-items:center; justify-content:center; border-bottom: 2px solid #4ecdc4;\'><span style=\'color:#fff; font-size:1.2em;\'>Asteroid Dodge</span></div>');">
             <div class="game-info">
                 <h3>Asteroid Dodge</h3>
                 <p>Navigate the cosmos, shoot asteroids, and survive the onslaught!</p>
+            </div>
+        </a>
+
+        <!-- New Ludo Game Card -->
+        <a href="ludo.html" class="game-card">
+            <img src="ludo_game_thumbnail.png" alt="Ludo Game Thumbnail" class="thumbnail" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#333'; this.parentElement.insertAdjacentHTML('afterbegin', '<div style=\'width:100%; height:180px; background-color:#333; display:flex; align-items:center; justify-content:center; border-bottom: 2px solid #4ecdc4;\'><span style=\'color:#fff; font-size:1.2em;\'>Ludo</span></div>');">
+            <div class="game-info">
+                <h3>Ludo Classic</h3>
+                <p>Roll the dice and race your tokens to home in this timeless board game!</p>
             </div>
         </a>
 
