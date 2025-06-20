@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gravity Painter Pro 2.0</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        :root {
+            --primary-color: #4ecdc4;
+            --secondary-color: #ff6b6b;
+            --accent-color: #f39c12;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0a0a, #1a1a2e, #16213e);
+            font-family: 'Orbitron', monospace;
+            color: white;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+            z-index: -2;
+            animation: bgPulse 10s ease-in-out infinite alternate;
+        }
+        
+        @keyframes bgPulse {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0.6; transform: scale(1.05); }
+        }
+        
+        .game-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 320px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(20px);
+            border-right: 2px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-shrink: 0;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .canvas-wrapper {
+            position: relative;
+            width: 95%;
+            height: 95%;
+            max-width: 1200px;
+            aspect-ratio: 4 / 3;
+            box-shadow: 
+                0 0 50px rgba(0, 0, 0, 0.5),
+                inset 0 0 50px rgba(255, 255, 255, 0.05);
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        
+        #trailCanvas, #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+        }
+
+        #gameCanvas {
+            z-index: 10;
+            cursor: crosshair;
+        }
+        
+        #trailCanvas {
+            z-index: 5;
+        }
+
+        .game-title {
+            font-size: 2.5em;
+            font-weight: 900;
+            text-align: center;
+            background: linear-gradient(45deg, var(--secondary-color), var(--primary-color), #45b7d1, var(--accent-color));
+            background-size: 400% 400%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientShift 3s ease-in-out infinite;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .control-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .section-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .control-group { margin-bottom: 15px; }
+        .control-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        label { font-size: 0.9em; opacity: 0.8; }
+        input[type="range"] { flex: 1; -webkit-appearance: none; background: rgba(255, 255, 255, 0.1); height: 6px; border-radius: 3px; outline: none;}
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: linear-gradient(45deg, #4ecdc4, #45b7d1); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px rgba(78, 205, 196, 0.5); }
+        input[type="color"] { width: 50px; height: 35px; border: none; border-radius: 8px; cursor: pointer; background: none; }
+        .value-display { min-width: 35px; text-align: center; font-weight: 700; color: var(--primary-color); }
+        .preset-colors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+        .color-preset { width: 100%; height: 35px; border: 2px solid transparent; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
+        .color-preset:hover { border-color: white; transform: scale(1.1); }
+        .color-preset.active { border-color: var(--primary-color); box-shadow: 0 0 15px rgba(78, 205, 196, 0.5); }
+        
+        .action-buttons { display: flex; flex-direction: column; gap: 10px; }
+        .btn { background: linear-gradient(45deg, var(--secondary-color), var(--primary-color)); border: none; padding: 12px 20px; border-radius: 25px; color: white; font-weight: 700; font-family: 'Orbitron', monospace; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; position: relative; overflow: hidden; }
+        .btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent); transition: left 0.5s; }
+        .btn:hover::before { left: 100%; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .btn:active { transform: translateY(0); }
+        .btn.secondary { background: linear-gradient(45deg, #34495e, #2c3e50); }
+        .btn.danger { background: linear-gradient(45deg, #e74c3c, #c0392b); }
+        
+        .stats-panel { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+        .stat-item { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px; text-align: center; }
+        .stat-value { font-size: 1.2em; font-weight: 700; color: var(--primary-color); }
+        .stat-label { font-size: 0.8em; opacity: 0.7; margin-top: 2px; }
+        
+        .selector-group { display: flex; gap: 5px; }
+        .selector-btn { flex: 1; padding: 8px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; color: white; font-family: 'Orbitron', monospace; font-size: 0.8em; cursor: pointer; transition: all 0.3s ease; }
+        .selector-btn.active { background: linear-gradient(45deg, var(--primary-color), #45b7d1); border-color: var(--primary-color); }
+        
+        .instructions { background: rgba(255, 255, 255, 0.05); border-left: 3px solid var(--primary-color); padding: 15px; border-radius: 10px; font-size: 0.85em; line-height: 1.4; opacity: 0.8; }
+        
+        .canvas-overlay { position: absolute; top: 35px; right: 35px; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); border-radius: 15px; padding: 15px; min-width: 200px; z-index: 20; }
+        
+        .objective { background: linear-gradient(45deg, rgba(255, 107, 107, 0.2), rgba(78, 205, 196, 0.2)); border-radius: 15px; padding: 15px; }
+        .objective-title { font-weight: 700; color: var(--accent-color); margin-bottom: 5px; }
+        .progress-bar { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary-color), #45b7d1); width: 0%; transition: width 0.5s ease; }
+        
+        #challenge-toast {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translate(-50%, -150%);
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            color: #0a0a0a;
+            padding: 20px 40px;
+            border-radius: 50px;
+            z-index: 1000;
+            font-size: 1.5em;
+            font-weight: 900;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        #challenge-toast.show {
+            transform: translate(-50%, 0);
+        }
+
+        @media (max-width: 1200px) { .sidebar { width: 280px; } .game-title { font-size: 2em; } }
+        @media (max-width: 768px) { .game-container { flex-direction: column; } .sidebar { width: 100%; height: auto; max-height: 50vh; order: 2; border-right: none; border-top: 2px solid rgba(255, 255, 255, 0.1);} .main-content { order: 1; padding: 10px; height: 100%; } .canvas-wrapper { width: 100%; height: auto; max-width: 100%; margin: auto;} }
+    </style>
+</head>
+<body>
+    <div id="challenge-toast">Challenge Complete!</div>
+    <div class="game-container">
+        <div class="sidebar">
+            <h1 class="game-title">Gravity Painter 2.0</h1>
+            
+            <div class="control-section">
+                <div class="section-title">🎯 Mission</div>
+                <div class="objective">
+                    <div class="objective-title">Current Challenge</div>
+                    <div id="currentObjective">Create 5 paint trails</div>
+                    <div class="progress-bar"><div class="progress-fill" id="progressBar"></div></div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div class="section-title">📊 Stats</div>
+                <div class="stats-panel">
+                    <div class="stat-item"><div class="stat-value" id="dropCount">0</div><div class="stat-label">Paint Drops</div></div>
+                    <div class="stat-item"><div class="stat-value" id="wellCount">0</div><div class="stat-label">Gravity Wells</div></div>
+                    <div class="stat-item"><div class="stat-value" id="trailCount">0</div><div class="stat-label">Trails Created</div></div>
+                    <div class="stat-item"><div class="stat-value" id="score">0</div><div class="stat-label">Score</div></div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">🛠️ Tools</div>
+                <div class="selector-group" id="tool-selector">
+                    <button class="selector-btn active" data-tool="attractor">Attractor</button>
+                    <button class="selector-btn" data-tool="repulsor">Repulsor</button>
+                    <button class="selector-btn" data-tool="blackhole">Black Hole</button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div class="section-title">🎨 Paint Settings</div>
+                <div class="control-group">
+                    <div class="control-row">
+                        <label>Size:</label>
+                        <input type="range" id="brushSize" min="2" max="15" value="5">
+                        <div class="value-display" id="brushSizeValue">5</div>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <div class="control-row">
+                        <label>Color:</label>
+                        <input type="color" id="colorPicker" value="#ff6b6b">
+                    </div>
+                    <div class="preset-colors">
+                        <div class="color-preset active" style="background: #ff6b6b" data-color="#ff6b6b"></div>
+                        <div class="color-preset" style="background: #4ecdc4" data-color="#4ecdc4"></div>
+                        <div class="color-preset" style="background: #45b7d1" data-color="#45b7d1"></div>
+                        <div class="color-preset" style="background: #f39c12" data-color="#f39c12"></div>
+                        <div class="color-preset" style="background: #e74c3c" data-color="#e74c3c"></div>
+                        <div class="color-preset" style="background: #9b59b6" data-color="#9b59b6"></div>
+                        <div class="color-preset" style="background: #2ecc71" data-color="#2ecc71"></div>
+                        <div class="color-preset" style="background: #f1c40f" data-color="#f1c40f"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div class="section-title">⚡ Physics</div>
+                <div class="control-group">
+                    <div class="control-row">
+                        <label>Gravity:</label>
+                        <input type="range" id="gravityStrength" min="20" max="200" value="80">
+                        <div class="value-display" id="gravityValue">80</div>
+                    </div>
+                    <div class="control-row">
+                        <label>Wind:</label>
+                        <input type="range" id="windStrength" min="0" max="50" value="10">
+                        <div class="value-display" id="windValue">10</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div class="section-title">🎮 Mode</div>
+                <div class="selector-group" id="mode-selector">
+                    <button class="selector-btn active" data-mode="creative">Creative</button>
+                    <button class="selector-btn" data-mode="challenge">Challenge</button>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="btn" onclick="game.addPaintDrop()">🎨 Add Paint Drop</button>
+                <button class="btn" onclick="game.addPaintBurst()">💥 Paint Burst</button>
+                <button class="btn secondary" id="pauseBtn" onclick="game.togglePause()">⏸️ Pause</button>
+                <button class="btn secondary" onclick="game.saveArtwork()">💾 Save Art</button>
+                <button class="btn danger" onclick="game.clearCanvas()">🗑️ Clear Canvas</button>
+            </div>
+            
+            <div class="instructions">
+                <strong>How to Play:</strong><br>
+                • Left-click & drag for Attractor wells.<br>
+                • Right-click & drag for Repulsor wells.<br>
+                • Use the Black Hole tool to consume paint.<br>
+                • Complete challenges to score points!
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="canvas-wrapper">
+                <canvas id="trailCanvas"></canvas>
+                <canvas id="gameCanvas"></canvas>
+            </div>
+            <div class="canvas-overlay">
+                <div style="font-size: 0.9em; margin-bottom: 10px;"><strong>FPS:</strong> <span id="fps">60</span></div>
+                <div style="font-size: 0.8em; opacity: 0.7;">
+                    <div>Active Particles: <span id="particleCount">0</span></div>
+                    <div>Physics Objects: <span id="physicsObjects">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple Sound Synthesizer
+        const sound = {
+            init() {
+                this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            },
+            play(type) {
+                if (!this.audioCtx || this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+                if (!this.audioCtx) return;
+
+                const oscillator = this.audioCtx.createOscillator();
+                const gainNode = this.audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0, this.audioCtx.currentTime);
+                
+                let freq = 220, duration = 0.1, wave = 'sine';
+                let gain = 0.2;
+
+                switch(type) {
+                    case 'well_start': freq = 150; gain = 0.1; wave = 'sine'; duration = 0.05; break;
+                    case 'well_end': freq = 300; gain = 0.1; wave = 'sine'; duration = 0.1; break;
+                    case 'burst': freq = 500; gain = 0.3; wave = 'triangle'; duration = 0.2; break;
+                    case 'trail_complete': freq = 660; gain = 0.4; wave = 'sine'; duration = 0.3; break;
+                    case 'blackhole_place': freq = 100; gain = 0.5; wave = 'sawtooth'; duration = 0.5; break;
+                    case 'blackhole_consume': freq = 80; gain = 0.3; wave = 'square'; duration = 0.1; break;
+                    case 'challenge_complete': freq = 880; gain = 0.5; wave = 'triangle'; duration = 0.5; break;
+                    case 'click': freq = 440; gain = 0.1; wave = 'triangle'; duration = 0.05; break;
+                }
+                
+                oscillator.type = wave;
+                oscillator.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(gain, this.audioCtx.currentTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, this.audioCtx.currentTime + duration);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(this.audioCtx.currentTime + duration);
+            }
+        };
+
+        class GravityPainterPro {
+            constructor() {
+                // Constants
+                this.WELL_LIFE_DECAY = 0.0005;
+                this.BLACK_HOLE_STRENGTH = 1500;
+                
+                // Canvas setup
+                this.gameCanvas = document.getElementById('gameCanvas');
+                this.gctx = this.gameCanvas.getContext('2d');
+                this.trailCanvas = document.getElementById('trailCanvas');
+                this.tctx = this.trailCanvas.getContext('2d');
+                
+                // State
+                this.isDrawing = false;
+                this.isPaused = false;
+                this.currentMode = 'creative';
+                this.currentTool = 'attractor';
+                this.currentWellType = 'attractor';
+
+                // Game objects
+                this.gravityWells = [];
+                this.blackHoles = [];
+                this.paintDrops = [];
+                this.particles = [];
+                this.currentPath = [];
+                
+                // Challenge State
+                this.score = 0;
+                this.trailsCreated = 0;
+                this.blackHoleFeeds = 0;
+                this.currentObjectiveIndex = 0;
+                this.usedColors = new Set();
+                this.objectives = [
+                    { text: "Create 5 paint trails", target: 5, type: "trails" },
+                    { text: "Use 3 different colors", target: 3, type: "colors" },
+                    { text: "Create a Repulsor well", target: 1, type: "repulsors" },
+                    { text: "Place a Black Hole", target: 1, type: "blackholes" },
+                    { text: "Feed a Black Hole 10 drops", target: 10, type: "feeds" },
+                    { text: "Score 1000 points", target: 1000, type: "score" },
+                    { text: "Master Artist! Create 20 trails", target: 20, type: "trails" }
+                ];
+                
+                // Animation & Timing
+                this.lastTime = 0;
+                this.fps = 0;
+                
+                this.setupEventListeners();
+                this.setupControls();
+                this.resizeCanvas();
+                this.updateObjective();
+                requestAnimationFrame(this.animate.bind(this));
+            }
+
+            resizeCanvas() {
+                const wrapper = document.querySelector('.canvas-wrapper');
+                // Use clientWidth and clientHeight for sizing based on CSS
+                const { clientWidth, clientHeight } = wrapper;
+                
+                this.gameCanvas.width = this.trailCanvas.width = clientWidth;
+                this.gameCanvas.height = this.trailCanvas.height = clientHeight;
+
+                // Redraw the permanent background
+                this.tctx.fillStyle = 'rgba(0,0,0,1)';
+                this.tctx.fillRect(0,0,clientWidth,clientHeight);
+
+                // This is where you would redraw any existing permanent trails if you stored them
+            }
+            
+            setupEventListeners() {
+                window.addEventListener('resize', () => this.resizeCanvas());
+                
+                // Initialize sound on first user interaction
+                document.body.addEventListener('mousedown', () => sound.init(), { once: true });
+                document.body.addEventListener('touchstart', () => sound.init(), { once: true });
+
+                this.gameCanvas.addEventListener('mousedown', e => this.handleMouseDown(e));
+                this.gameCanvas.addEventListener('mousemove', e => this.handleMouseMove(e));
+                window.addEventListener('mouseup', () => this.handleMouseUp()); // Listen on window for release outside canvas
+                this.gameCanvas.addEventListener('mouseleave', () => this.handleMouseUp());
+                this.gameCanvas.addEventListener('contextmenu', e => e.preventDefault()); // Prevent right-click menu
+                
+                // Touch support
+                const handleTouchStart = e => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousedown', { clientX: touch.clientX, clientY: touch.clientY, button: 0 });
+                    this.gameCanvas.dispatchEvent(mouseEvent);
+                };
+                const handleTouchMove = e => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY });
+                    this.gameCanvas.dispatchEvent(mouseEvent);
+                };
+                this.gameCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+                this.gameCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+                this.gameCanvas.addEventListener('touchend', () => this.handleMouseUp());
+            }
+            
+            setupControls() {
+                const updateValueDisplay = (sliderId, displayId) => {
+                    document.getElementById(sliderId).addEventListener('input', e => {
+                        document.getElementById(displayId).textContent = e.target.value;
+                    });
+                };
+                updateValueDisplay('brushSize', 'brushSizeValue');
+                updateValueDisplay('gravityStrength', 'gravityValue');
+                updateValueDisplay('windStrength', 'windValue');
+
+                document.querySelectorAll('.color-preset').forEach(preset => {
+                    preset.addEventListener('click', () => {
+                        sound.play('click');
+                        document.querySelectorAll('.color-preset').forEach(p => p.classList.remove('active'));
+                        preset.classList.add('active');
+                        document.getElementById('colorPicker').value = preset.dataset.color;
+                    });
+                });
+                
+                document.getElementById('mode-selector').addEventListener('click', e => {
+                    if (e.target.tagName === 'BUTTON') {
+                        sound.play('click');
+                        document.querySelectorAll('#mode-selector .selector-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentMode = e.target.dataset.mode;
+                        if (this.currentMode === 'challenge') {
+                             this.clearCanvas(true);
+                        }
+                    }
+                });
+
+                 document.getElementById('tool-selector').addEventListener('click', e => {
+                    if (e.target.tagName === 'BUTTON') {
+                        sound.play('click');
+                        document.querySelectorAll('#tool-selector .selector-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentTool = e.target.dataset.tool;
+                    }
+                });
+            }
+            
+            getMousePos(e) {
+                const rect = this.gameCanvas.getBoundingClientRect();
+                return { 
+                    x: (e.clientX - rect.left) * (this.gameCanvas.width / rect.width), 
+                    y: (e.clientY - rect.top) * (this.gameCanvas.height / rect.height)
+                };
+            }
+
+            handleMouseDown(e) {
+                const pos = this.getMousePos(e);
+                if (this.currentTool === 'blackhole') {
+                    this.addBlackHole(pos.x, pos.y);
+                    return;
+                }
+                
+                this.isDrawing = true;
+                this.currentPath = [pos];
+                this.currentWellType = (e.button === 2) ? 'repulsor' : 'attractor'; // Right-click for repulsor
+                const color = this.currentWellType === 'repulsor' ? '#ff4d4d' : '#4ecdc4';
+                this.createParticleExplosion(pos.x, pos.y, 5, color);
+                sound.play('well_start');
+            }
+
+            handleMouseMove(e) {
+                if (!this.isDrawing) return;
+                this.currentPath.push(this.getMousePos(e));
+            }
+
+            handleMouseUp() {
+                if (!this.isDrawing) return;
+                this.isDrawing = false;
+                
+                if (this.currentPath.length > 3) {
+                    this.gravityWells.push({
+                        path: [...this.currentPath],
+                        strength: parseFloat(document.getElementById('gravityStrength').value),
+                        type: this.currentWellType,
+                        life: 1.0
+                    });
+                    this.score += 10;
+                    
+                    const lastPoint = this.currentPath[this.currentPath.length - 1];
+                    const color = this.currentWellType === 'repulsor' ? '#ff4d4d' : '#4ecdc4';
+                    this.createParticleExplosion(lastPoint.x, lastPoint.y, 10, color);
+                    sound.play('well_end');
+                    this.checkObjectives();
+                }
+                this.currentPath = [];
+            }
+            
+            addPaintDrop() {
+                const color = document.getElementById('colorPicker').value;
+                this.usedColors.add(color);
+                this.paintDrops.push({
+                    x: Math.random() * this.gameCanvas.width, y: 20 + Math.random() * 50,
+                    vx: (Math.random() - 0.5) * 3, vy: Math.random() * 2,
+                    color: color, size: parseFloat(document.getElementById('brushSize').value),
+                    trail: [], life: 2000, hasCreatedTrail: false
+                });
+                this.checkObjectives();
+            }
+            
+            addPaintBurst() {
+                sound.play('burst');
+                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f39c12', '#e74c3c', '#9b59b6'];
+                const centerX = this.gameCanvas.width / 2, centerY = 100;
+                for (let i = 0; i < 15; i++) {
+                    const angle = (i / 15) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+                    const speed = 4 + Math.random() * 3;
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    this.usedColors.add(color);
+                    this.paintDrops.push({
+                        x: centerX, y: centerY, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        color: color, size: 3 + Math.random() * 4,
+                        trail: [], life: 2000, hasCreatedTrail: false
+                    });
+                }
+                this.createParticleExplosion(centerX, centerY, 50, '#ffffff');
+                this.score += 25;
+                this.checkObjectives();
+            }
+
+            addBlackHole(x, y) {
+                sound.play('blackhole_place');
+                this.blackHoles.push({
+                    x, y, strength: this.BLACK_HOLE_STRENGTH,
+                    size: 15, life: 1.0, pulse: 0
+                });
+                this.score += 50;
+                this.createParticleExplosion(x, y, 40, '#9b59b6');
+                this.checkObjectives();
+            }
+            
+            createParticleExplosion(x, y, count, color) {
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 1 + Math.random() * 4;
+                    this.particles.push({
+                        x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        color, size: 1 + Math.random() * 2, life: 1.0, decay: 0.01 + Math.random() * 0.02
+                    });
+                }
+            }
+            
+            clearCanvas(resetScoreAndObjectives = true) {
+                // Clear permanent canvas
+                this.tctx.clearRect(0, 0, this.trailCanvas.width, this.trailCanvas.height);
+                this.tctx.fillStyle = 'rgba(0,0,0,1)';
+                this.tctx.fillRect(0,0,this.trailCanvas.width, this.trailCanvas.height);
+                
+                // Clear active objects
+                this.gravityWells = [];
+                this.blackHoles = [];
+                this.paintDrops = [];
+                this.particles = [];
+                
+                if (resetScoreAndObjectives) {
+                    this.score = 0;
+                    this.trailsCreated = 0;
+                    this.blackHoleFeeds = 0;
+                    this.usedColors.clear();
+                    this.currentObjectiveIndex = 0;
+                    this.updateObjective();
+                }
+            }
+            
+            togglePause() {
+                sound.play('click');
+                this.isPaused = !this.isPaused;
+                document.getElementById('pauseBtn').innerHTML = this.isPaused ? '▶️ Resume' : '⏸️ Pause';
+                if (!this.isPaused) {
+                    requestAnimationFrame(this.animate.bind(this)); // Restart animation loop
+                }
+            }
+            
+            saveArtwork() {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = this.gameCanvas.width;
+                tempCanvas.height = this.gameCanvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                // Draw background, then active elements for a complete picture
+                tempCtx.drawImage(this.trailCanvas, 0, 0);
+                this.drawAll(performance.now(), tempCtx); // Use a temporary draw call to the save canvas
+
+                const link = document.createElement('a');
+                link.download = `gravity-art-${Date.now()}.png`;
+                link.href = tempCanvas.toDataURL();
+                link.click();
+                this.score += 50;
+            }
+
+            update(time) {
+                // Wind
+                const windStrength = parseFloat(document.getElementById('windStrength').value) * 0.001;
+                const windForce = { x: Math.cos(time / 2000) * windStrength, y: Math.sin(time / 1500) * windStrength };
+
+                // Update Paint Drops
+                this.paintDrops = this.paintDrops.filter(drop => {
+                    let totalForce = { x: 0, y: 0 };
+                    
+                    const allAttractors = [...this.gravityWells, ...this.blackHoles];
+                    allAttractors.forEach(attractor => {
+                        const path = attractor.path || [{x: attractor.x, y: attractor.y}];
+                        const type = attractor.type || 'attractor';
+                        const sign = type === 'repulsor' ? -1 : 1;
+                        
+                        for (let i = 0; i < path.length; i += 5) {
+                            const point = path[i];
+                            const dx = point.x - drop.x;
+                            const dy = point.y - drop.y;
+                            let distSq = dx * dx + dy * dy;
+                            if (distSq < 1) distSq = 1;
+                            const force = sign * attractor.strength / distSq;
+                            totalForce.x += dx * force;
+                            totalForce.y += dy * force;
+                        }
+                    });
+
+                    // Consume by black hole
+                    for(const bh of this.blackHoles) {
+                        const dx = bh.x - drop.x;
+                        const dy = bh.y - drop.y;
+                        if(dx*dx + dy*dy < bh.size * bh.size) {
+                            this.createParticleExplosion(bh.x, bh.y, 15, drop.color);
+                            sound.play('blackhole_consume');
+                            this.score += 20;
+                            this.blackHoleFeeds++;
+                            this.checkObjectives();
+                            return false; // Remove drop
+                        }
+                    }
+
+                    drop.vx += totalForce.x * 0.01 + windForce.x;
+                    drop.vy += totalForce.y * 0.01 + windForce.y;
+                    drop.vx *= 0.98;
+                    drop.vy *= 0.98;
+                    drop.x += drop.vx;
+                    drop.y += drop.vy;
+                    drop.trail.push({ x: drop.x, y: drop.y });
+                    
+                    if (drop.x < drop.size) { drop.x = drop.size; drop.vx *= -0.5; }
+                    if (drop.x > this.gameCanvas.width - drop.size) { drop.x = this.gameCanvas.width - drop.size; drop.vx *= -0.5; }
+                    if (drop.y < drop.size) { drop.y = drop.size; drop.vy *= -0.5; }
+                    if (drop.y > this.gameCanvas.height - drop.size) { drop.y = this.gameCanvas.height - drop.size; drop.vy *= -0.5; }
+
+                    if (!drop.hasCreatedTrail && drop.trail.length > 50 && (drop.vx * drop.vx + drop.vy * drop.vy) < 0.1) {
+                        this.drawPermanentTrail({ path: [...drop.trail], color: drop.color, size: drop.size });
+                        this.trailsCreated++;
+                        this.score += 50 + Math.floor(drop.trail.length / 10);
+                        drop.hasCreatedTrail = true;
+                        this.checkObjectives();
+                        this.createParticleExplosion(drop.x, drop.y, 20, drop.color);
+                        sound.play('trail_complete');
+                    }
+                    
+                    drop.life--;
+                    return drop.life > 0;
+                });
+
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx; p.y += p.vy; p.life -= p.decay;
+                    return p.life > 0;
+                });
+
+                this.gravityWells = this.gravityWells.filter(well => {
+                    well.life -= this.WELL_LIFE_DECAY;
+                    return well.life > 0;
+                });
+                this.blackHoles.forEach(bh => bh.pulse += 0.05);
+            }
+            
+            drawPermanentTrail(trail) {
+                this.tctx.beginPath();
+                this.tctx.strokeStyle = trail.color;
+                this.tctx.lineWidth = trail.size;
+                this.tctx.lineCap = 'round';
+                this.tctx.lineJoin = 'round';
+                this.tctx.globalAlpha = 0.8;
+                this.tctx.shadowColor = trail.color;
+                this.tctx.shadowBlur = trail.size * 2;
+                if(trail.path.length > 0) this.tctx.moveTo(trail.path[0].x, trail.path[0].y);
+                for (let i = 1; i < trail.path.length; i++) {
+                    this.tctx.lineTo(trail.path[i].x, trail.path[i].y);
+                }
+                this.tctx.stroke();
+                this.tctx.globalAlpha = 1.0;
+                this.tctx.shadowBlur = 0;
+            }
+
+            drawAll(time, ctx = this.gctx) {
+                if (ctx === this.gctx) {
+                    ctx.clearRect(0, 0, this.gameCanvas.width, this.gameCanvas.height);
+                }
+                
+                this.gravityWells.forEach(well => {
+                    ctx.beginPath();
+                    const color = well.type === 'repulsor' ? `rgba(255, 77, 77, ${0.2 * well.life})` : `rgba(78, 205, 196, ${0.2 * well.life})`;
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    if(well.path.length > 0) ctx.moveTo(well.path[0].x, well.path[0].y);
+                    for (let i = 1; i < well.path.length; i++) ctx.lineTo(well.path[i].x, well.path[i].y);
+                    ctx.stroke();
+                });
+
+                this.blackHoles.forEach(bh => {
+                    const radius = bh.size * (1 + Math.sin(bh.pulse) * 0.1);
+                    const grad = ctx.createRadialGradient(bh.x, bh.y, 1, bh.x, bh.y, radius);
+                    grad.addColorStop(0, '#ff00ff');
+                    grad.addColorStop(0.5, '#9b59b6');
+                    grad.addColorStop(1, 'rgba(155, 89, 182, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(bh.x, bh.y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                if (this.isDrawing && this.currentPath.length > 1) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([5, 5]);
+                    ctx.moveTo(this.currentPath[0].x, this.currentPath[0].y);
+                    for (let i = 1; i < this.currentPath.length; i++) {
+                        ctx.lineTo(this.currentPath[i].x, this.currentPath[i].y);
+                    }
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                
+                this.paintDrops.forEach(drop => {
+                    ctx.fillStyle = drop.color;
+                    ctx.shadowColor = drop.color;
+                    ctx.shadowBlur = drop.size * 3;
+                    ctx.beginPath();
+                    ctx.arc(drop.x, drop.y, drop.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.shadowBlur = 0;
+
+                ctx.globalCompositeOperation = 'lighter';
+                this.particles.forEach(p => {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.globalAlpha = 1.0;
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            updateStats(fps) {
+                document.getElementById('fps').textContent = isNaN(fps) ? '...' : fps;
+                document.getElementById('dropCount').textContent = this.paintDrops.length;
+                document.getElementById('wellCount').textContent = this.gravityWells.length + this.blackHoles.length;
+                document.getElementById('trailCount').textContent = this.trailsCreated;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('particleCount').textContent = this.particles.length;
+                document.getElementById('physicsObjects').textContent = this.paintDrops.length + this.gravityWells.length + this.blackHoles.length;
+            }
+
+            updateObjective() {
+                if (this.currentObjectiveIndex >= this.objectives.length) {
+                    document.getElementById('currentObjective').textContent = "All Challenges Complete!";
+                    document.getElementById('progressBar').style.width = '100%';
+                    return;
+                }
+                const objective = this.objectives[this.currentObjectiveIndex];
+                document.getElementById('currentObjective').textContent = objective.text;
+                this.checkObjectives();
+            }
+            
+            checkObjectives() {
+                if (this.currentMode !== 'challenge' || this.currentObjectiveIndex >= this.objectives.length) return;
+                
+                const objective = this.objectives[this.currentObjectiveIndex];
+                let currentProgress = 0;
+                
+                switch(objective.type) {
+                    case 'trails': currentProgress = this.trailsCreated; break;
+                    case 'score': currentProgress = this.score; break;
+                    case 'colors': currentProgress = this.usedColors.size; break;
+                    case 'repulsors': currentProgress = this.gravityWells.filter(w => w.type === 'repulsor').length; break;
+                    case 'blackholes': currentProgress = this.blackHoles.length; break;
+                    case 'feeds': currentProgress = this.blackHoleFeeds; break;
+                }
+                
+                const progressPercent = Math.min(100, (currentProgress / objective.target) * 100);
+                document.getElementById('progressBar').style.width = `${progressPercent}%`;
+                
+                if (currentProgress >= objective.target) {
+                    this.score += 250;
+                    this.currentObjectiveIndex++;
+                    sound.play('challenge_complete');
+                    this.showChallengeToast();
+                    this.createParticleExplosion(this.gameCanvas.width / 2, this.gameCanvas.height / 2, 200, '#f39c12');
+                    this.updateObjective();
+                }
+            }
+
+            showChallengeToast() {
+                const toast = document.getElementById('challenge-toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2500);
+            }
+            
+            animate(time) {
+                if(this.isPaused) return;
+
+                const deltaTime = time - this.lastTime;
+                const fps = Math.round(1000 / deltaTime);
+                this.lastTime = time;
+
+                this.update(time);
+                this.drawAll(time);
+                this.updateStats(fps);
+
+                requestAnimationFrame(this.animate.bind(this));
+            }
+        }
+
+        const game = new GravityPainterPro();
+    </script>
+</body>
+</html>
