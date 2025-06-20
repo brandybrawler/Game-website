@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Asteroid Dodge - Ultra Enhanced</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* Disable tap highlight on touch devices */
         }
 
         body {
@@ -27,6 +28,7 @@
             width: 100vw;
             height: 100vh;
             overflow: hidden;
+            touch-action: none; /* Prevent default touch actions like pinch-zoom on the container */
         }
 
         .game-canvas {
@@ -41,7 +43,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
+            pointer-events: none; /* Allows clicks to pass through to canvas unless overridden */
             z-index: 10;
         }
 
@@ -120,17 +122,41 @@
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
-            padding: 8px 12px;
+            padding: 10px 15px; /* Increased padding */
             border-radius: 5px;
             cursor: pointer;
-            font-size: 14px;
-            margin-left: 5px;
+            font-size: 15px; /* Slightly larger font */
+            margin-left: 8px; /* Spacing between buttons */
             transition: all 0.3s ease;
         }
 
         .audio-btn:hover {
             background: rgba(255, 255, 255, 0.2);
         }
+        
+        /* Styling for the new Pause Button */
+        .control-btn {
+            position: absolute;
+            bottom: 100px; 
+            left: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            pointer-events: auto; /* Make it clickable */
+            z-index: 11; 
+            min-width: 50px; 
+            text-align: center;
+            transition: background-color 0.3s ease;
+        }
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
 
         .start-screen, .game-over-screen {
             position: absolute;
@@ -210,6 +236,7 @@
             font-size: 14px;
             opacity: 0.7;
             line-height: 1.5;
+            max-width: 90%; /* Ensure it fits on smaller screens */
         }
         .instructions .powerup-key {
             color: #a0a0ff; font-weight: bold;
@@ -315,6 +342,9 @@
             <div class="level-display">Level: <span id="level">1</span></div>
             <div class="multiplier-display">Multiplier: <span id="multiplier">1x</span></div>
             <div class="ability-display" id="abilityDisplay"></div>
+            
+            <button class="control-btn" id="pauseBtn">||</button>
+            
             <div class="audio-controls">
                 <button class="audio-btn" id="musicToggle">Music: ON</button>
                 <button class="audio-btn" id="sfxToggle">SFX: ON</button>
@@ -329,13 +359,14 @@
             <button class="btn" id="startGameBtn">START GAME</button>
             <div class="instructions">
                 Use ARROW KEYS or WASD to move your ship<br>
-                Press SPACE to shoot lasers<br>
+                Touch and DRAG the ship to move (auto-shoots while dragging)<br>
+                Press SPACE to shoot lasers (keyboard)<br>
                 Shoot power-up capsules for temporary abilities:<br>
                 <span class="powerup-key">D</span> - Double Laser, <span class="powerup-key">S</span> - Shield, <span class="powerup-key">R</span> - Rapid Fire<br>
                 <span class="powerup-key">T</span> - Time Slow, <span class="powerup-key">G</span> - Ghost Mode<br>
                 Destroy asteroids in succession for score multipliers!<br>
                 During Boss Battles: Keep the boss from reaching the bottom!<br>
-                Press 'P' to Pause/Resume
+                Press 'P' or use Pause Button to Pause/Resume
             </div>
         </div>
 
@@ -358,7 +389,7 @@
         const ctx = canvas.getContext('2d');
         const gameContainer = document.getElementById('gameContainer');
         const scoreEl = document.getElementById('score');
-        const highScoreEl = document.getElementById('highScoreText'); // Renamed for clarity vs. variable highScore
+        const highScoreEl = document.getElementById('highScoreText');
         const healthEl = document.getElementById('health');
         const levelEl = document.getElementById('level');
         const multiplierEl = document.getElementById('multiplier');
@@ -378,8 +409,10 @@
         const startGameBtn = document.getElementById('startGameBtn');
         const restartGameBtn = document.getElementById('restartGameBtn');
         const gameOverReasonEl = document.getElementById('gameOverReason');
+        const pauseBtn = document.getElementById('pauseBtn');
 
-        let W, H; // Cached canvas width and height
+
+        let W, H; 
 
         let animationFrameId;
         let menuAnimationFrameId;
@@ -391,28 +424,32 @@
         let sfxEnabled = true;
         let backgroundMusic = null;
 
-        const BOSS_DOWNWARD_DRIFT_BASE = 0.025; // Slightly reduced for new AI
+        const BOSS_DOWNWARD_DRIFT_BASE = 0.025; 
         const BOSS_DOWNWARD_DRIFT_LEVEL_SCALE = 0.004;
         const NUDGE_PER_HIT = 1.2; 
         const SHIELD_BOSS_NUDGE_FACTOR = 15; 
         const DANGER_ZONE_HEIGHT = 30; 
 
-        // Particle Pooling
         let particlePool = [];
         const MAX_PARTICLES_IN_POOL = 300;
+
+        // Pointer (Mouse/Touch) State
+        let pointerTargetX = null;
+        let pointerTargetY = null;
+        let isPointerActive = false;
+
 
         function getParticleFromPool() {
             if (particlePool.length > 0) {
                 return particlePool.pop();
             }
-            return {}; // Return empty object to be populated
+            return {};
         }
 
         function releaseParticleToPool(particle) {
             if (particlePool.length < MAX_PARTICLES_IN_POOL) {
                 particlePool.push(particle);
             }
-            // If pool is full, the particle will be garbage collected when it's no longer referenced
         }
 
 
@@ -644,9 +681,77 @@
         });
         document.addEventListener('keyup', (e) => { gameState.keys[e.code] = false; });
 
+        // Touch and Mouse Input Handling
+        function getPointerPosition(event) {
+            const rect = canvas.getBoundingClientRect();
+            if (event.touches && event.touches.length > 0) {
+                // Use the first touch for simplicity
+                return { x: event.touches[0].clientX - rect.left, y: event.touches[0].clientY - rect.top };
+            }
+            // For mouse events
+            return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        }
+
+        gameContainer.addEventListener('mousedown', (e) => {
+            if (!gameState.running || gameState.paused) return; // Only control player if game is active
+            if (e.target === canvas) { // Ensure interaction is on the canvas itself
+                isPointerActive = true;
+                const pos = getPointerPosition(e);
+                pointerTargetX = pos.x;
+                pointerTargetY = pos.y;
+                e.preventDefault();
+            }
+        });
+
+        gameContainer.addEventListener('mousemove', (e) => {
+            if (!gameState.running || gameState.paused || !isPointerActive) return;
+            // For mouse, e.buttons === 1 checks if left button is down while moving
+            if (e.buttons === 1 && e.target === canvas) { 
+                const pos = getPointerPosition(e);
+                pointerTargetX = pos.x;
+                pointerTargetY = pos.y;
+                e.preventDefault();
+            } else if (e.buttons !== 1) { // If mouse button released outside canvas
+                isPointerActive = false;
+            }
+        });
+
+        gameContainer.addEventListener('mouseup', (e) => {
+            isPointerActive = false;
+            // No need to preventDefault here usually, might interfere with UI
+        });
+
+        gameContainer.addEventListener('touchstart', (e) => {
+            if (!gameState.running || gameState.paused) return;
+            if (e.target === canvas) {
+                isPointerActive = true;
+                const pos = getPointerPosition(e);
+                pointerTargetX = pos.x;
+                pointerTargetY = pos.y;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        gameContainer.addEventListener('touchmove', (e) => {
+            if (!gameState.running || gameState.paused || !isPointerActive) return;
+            if (e.target === canvas) {
+                const pos = getPointerPosition(e);
+                pointerTargetX = pos.x;
+                pointerTargetY = pos.y;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        gameContainer.addEventListener('touchend', (e) => {
+            isPointerActive = false;
+        });
+
+
         function togglePause() {
             gameState.paused = !gameState.paused;
             pauseTextEl.classList.toggle('hidden', !gameState.paused);
+            if (pauseBtn) pauseBtn.textContent = gameState.paused ? '▶' : '||';
+
             if (gameState.paused) {
                 stopBackgroundMusic();
                 if (animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -656,46 +761,87 @@
                 animationFrameId = requestAnimationFrame(gameLoop);
             }
         }
+        if(pauseBtn) {
+            pauseBtn.addEventListener('click', () => {
+                if (gameState.running) { // Only allow pause if game is running
+                    togglePause();
+                }
+            });
+        }
+
 
         function updatePlayer(currentTime) {
             const { player, keys } = gameState;
-
-            let movedX = 0;
-            let movedY = 0;
             let deltaX = 0;
             let deltaY = 0;
+            let movedX = 0;
+            let movedY = 0;
+            let isActivelyMovingViaPointer = false;
 
-            if (keys['ArrowLeft'] || keys['KeyA']) { deltaX -= player.speed; movedX = -1; }
-            if (keys['ArrowRight'] || keys['KeyD']) { deltaX += player.speed; movedX = (deltaX === 0 && movedX === -1) ? 0 : 1; }
-            if (keys['ArrowUp'] || keys['KeyW']) { deltaY -= player.speed; movedY = -1; }
-            if (keys['ArrowDown'] || keys['KeyS']) { deltaY += player.speed; movedY = (deltaY === 0 && movedY === -1) ? 0 : 1; }
-            
-            if (deltaX !== 0 && deltaY !== 0) {
-                const factor = 1 / Math.sqrt(2);
-                deltaX *= factor;
-                deltaY *= factor;
+            if (isPointerActive && pointerTargetX !== null && pointerTargetY !== null) {
+                const targetDist = Math.hypot(pointerTargetX - player.x, pointerTargetY - player.y);
+                const moveThreshold = player.size * 0.1; // Small threshold to start moving
+
+                if (targetDist > moveThreshold) {
+                    deltaX = (pointerTargetX - player.x);
+                    deltaY = (pointerTargetY - player.y);
+
+                    const len = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    if (len > 0) {
+                        // Move player at its speed, but don't overshoot target
+                        const moveStepX = (deltaX / len) * player.speed;
+                        const moveStepY = (deltaY / len) * player.speed;
+                        if (Math.abs(moveStepX) > Math.abs(deltaX)) deltaX = deltaX; else deltaX = moveStepX;
+                        if (Math.abs(moveStepY) > Math.abs(deltaY)) deltaY = deltaY; else deltaY = moveStepY;
+                    }
+                    isActivelyMovingViaPointer = true;
+                }
+                
+                // For thruster direction (approximate from delta before normalization)
+                if (deltaX < -0.1) movedX = -1; else if (deltaX > 0.1) movedX = 1; else movedX = 0;
+                if (deltaY < -0.1) movedY = -1; else if (deltaY > 0.1) movedY = 1; else movedY = 0;
+
+            } else { // Keyboard controls
+                if (keys['ArrowLeft'] || keys['KeyA']) { deltaX -= player.speed; movedX = -1; }
+                if (keys['ArrowRight'] || keys['KeyD']) { deltaX += player.speed; movedX = (movedX === -1 && deltaX === 0) ? 0 : 1; } // Fix potential conflict
+                if (keys['ArrowUp'] || keys['KeyW']) { deltaY -= player.speed; movedY = -1; }
+                if (keys['ArrowDown'] || keys['KeyS']) { deltaY += player.speed; movedY = (movedY === -1 && deltaY === 0) ? 0 : 1; } // Fix potential conflict
+                
+                if (deltaX !== 0 && deltaY !== 0) { // Diagonal speed correction for keyboard
+                    const factor = 1 / Math.sqrt(2);
+                    deltaX *= factor;
+                    deltaY *= factor;
+                }
             }
 
-            let targetX = player.x + deltaX;
-            let targetY = player.y + deltaY;
+            let targetPlayerX = player.x + deltaX;
+            let targetPlayerY = player.y + deltaY;
             
             const playerHalfWidth = player.size * 0.8;
             const playerTopExtent = player.size; 
             const playerBottomExtent = player.size * 0.6;
 
-            player.x = Math.max(playerHalfWidth, Math.min(W - playerHalfWidth, targetX));
-            player.y = Math.max(playerTopExtent, Math.min(H - playerBottomExtent, targetY));
+            player.x = Math.max(playerHalfWidth, Math.min(W - playerHalfWidth, targetPlayerX));
+            player.y = Math.max(playerTopExtent, Math.min(H - playerBottomExtent, targetPlayerY));
             
-            if (deltaX === 0) movedX = 0;
-            if (deltaY === 0) movedY = 0;
             player.lastMoveDir = {x: movedX, y: movedY};
 
-            if (keys['Space'] && currentTime - gameState.lastShot > gameState.shootCooldown) {
+            // Shooting logic
+            let shouldShoot = false;
+            if (isActivelyMovingViaPointer) { // Auto-shoot if actively moving via pointer
+                 shouldShoot = true;
+            }
+            if (keys['Space']) { // Keyboard shoot
+                shouldShoot = true;
+            }
+
+            if (shouldShoot && currentTime - gameState.lastShot > gameState.shootCooldown) {
                 shoot();
                 gameState.lastShot = currentTime;
             }
 
-            if (movedY < 0 || (movedX !==0 && movedY ===0) || Math.random() < 0.2) { 
+            // Thruster visual
+            if (movedY < 0 || (movedX !==0 && movedY ===0) || (isActivelyMovingViaPointer && Math.random() < 0.2)) { 
                 player.thrusterSize = player.size * (0.6 + Math.random() * 0.5);
             } else {
                 player.thrusterSize = 0;
@@ -714,7 +860,7 @@
             }
 
             playShootSound();
-            if (activeAbility && activeAbility.type === 'doubleLaser' && Date.now() < activeAbility.endTime) { // Date.now() here is fine for immediate check
+            if (activeAbility && activeAbility.type === 'doubleLaser' && Date.now() < activeAbility.endTime) {
                 gameState.bullets.push({ ...bulletBaseProps, x: player.x - 7 });
                 gameState.bullets.push({ ...bulletBaseProps, x: player.x + 7 });
             } else {
@@ -752,7 +898,7 @@
             const asteroidColor = `rgb(${colorShade},${colorShade},${colorShade + Math.floor(Math.random()*10)})`; 
 
             const newAsteroid = {
-                id: Date.now() + Math.random(), // Date.now() for unique ID is fine
+                id: Date.now() + Math.random(),
                 x: x, y: y,
                 size: size,
                 speed: gameState.isTimeSlowActive ? baseSpeed * 0.3 : baseSpeed,
@@ -807,7 +953,6 @@
             checkNearMisses(currentTime); 
         }
         
-        // Helper function for boss angle normalization
         function normalizeAngle(angle) {
             while (angle > Math.PI) angle -= 2 * Math.PI;
             while (angle < -Math.PI) angle += 2 * Math.PI;
@@ -817,11 +962,11 @@
         function spawnBossAsteroid() {
             gameState.bossActive = true;
             const size = 100 + gameState.level * 8; 
-            const baseAISpeed = 0.5 + gameState.level * 0.05; // Slightly increased base AI speed
+            const baseAISpeed = 0.5 + gameState.level * 0.05;
             const baseDriftSpeed = BOSS_DOWNWARD_DRIFT_BASE + gameState.level * BOSS_DOWNWARD_DRIFT_LEVEL_SCALE;
 
             gameState.bossData = {
-                id: 'boss_' + Date.now(), // Date.now() for unique ID is fine
+                id: 'boss_' + Date.now(),
                 x: W / 2,
                 y: -size, 
                 size: size,
@@ -837,12 +982,11 @@
                 damageLevel: 0,
                 shapePoints: generateAsteroidShapePoints(size), 
                 color: '#503030', 
-                lastActionTime: 0, // Used for specific actions like minion spawn cooldown
-                actionCooldown: 2000, // General cooldown for certain actions if needed
+                lastActionTime: 0,
+                actionCooldown: 2000, 
                 isBossComponent: true,
-                // New AI state properties
                 behavior: 'ENTERING', 
-                behaviorTimer: 2500, // Time to enter and position
+                behaviorTimer: 2500, 
                 targetX: W / 2,
                 targetY: H * 0.2, 
                 chargeTargetX: 0,
@@ -857,18 +1001,15 @@
             if (!gameState.bossActive || !gameState.bossData) return;
             const boss = gameState.bossData;
             
-            // Approximate delta time in ms for timer (assuming ~60fps)
-            // For more accuracy, pass actual deltaTime from gameLoop
             const deltaTimeMs = gameState.lastTime ? (currentTime - gameState.lastTime) : (1000/60);
             boss.behaviorTimer -= deltaTimeMs;
 
-            // State Machine
             if (boss.behaviorTimer <= 0) {
                 switch(boss.behavior) {
                     case 'ENTERING':
                         boss.behavior = 'SWEEPING';
                         boss.targetX = Math.random() * (W - boss.size * 2) + boss.size;
-                        boss.targetY = H * (0.15 + Math.random() * 0.2); // Upper sweep area
+                        boss.targetY = H * (0.15 + Math.random() * 0.2);
                         boss.behaviorTimer = 4000 + Math.random() * 3000;
                         break;
                     case 'SWEEPING':
@@ -890,30 +1031,28 @@
                         boss.chargeTargetX = gameState.player.x;
                         boss.chargeTargetY = Math.min(gameState.player.y + boss.size * 0.5, H - DANGER_ZONE_HEIGHT - boss.size * 0.7);
                         boss.behaviorTimer = 1600 + Math.random() * 600; 
-                        // Could add a visual/audio telegraph for the charge here
                         break;
                     case 'CHARGING':
                         boss.behavior = 'SWEEPING'; 
                         boss.targetX = Math.random() * (W - boss.size * 2) + boss.size;
-                        boss.targetY = H * (0.1 + Math.random() * 0.15); // Reposition higher after charge
+                        boss.targetY = H * (0.1 + Math.random() * 0.15); 
                         boss.behaviorTimer = 3000 + Math.random() * 2000;
                         break;
                 }
             }
 
-            // Movement Logic based on state
             let desiredAngle = boss.angle;
             let currentSpeed = gameState.isTimeSlowActive ? boss.originalSpeed * 0.3 : boss.originalSpeed;
             let currentDrift = gameState.isTimeSlowActive ? boss.originalDownwardDriftSpeed * 0.3 : boss.originalDownwardDriftSpeed;
 
-            const turnRate = 0.035; // Radians per frame (approx)
+            const turnRate = 0.035; 
 
             switch(boss.behavior) {
                 case 'ENTERING':
                     desiredAngle = Math.atan2(boss.targetY - boss.y, boss.targetX - boss.x);
                     if (Math.hypot(boss.targetX - boss.x, boss.targetY - boss.y) < boss.size * 0.3) {
                         currentSpeed *= 0.5;
-                        if (boss.behaviorTimer > 50) boss.behaviorTimer = 50; // Force faster transition if arrived
+                        if (boss.behaviorTimer > 50) boss.behaviorTimer = 50;
                     }
                     break;
                 case 'SWEEPING':
@@ -943,13 +1082,12 @@
             boss.y += Math.sin(boss.angle) * currentSpeed;
             boss.y += currentDrift;
 
-            // Boundary checks
             boss.x = Math.max(boss.size * 0.7, Math.min(W - boss.size * 0.7, boss.x));
             if ((boss.x <= boss.size * 0.7 || boss.x >= W - boss.size * 0.7)) {
                 if (boss.behavior === 'SWEEPING' || boss.behavior === 'ENTERING') {
-                     boss.targetX = (boss.x <= W / 2) ? (W - boss.size * 1.5) : (boss.size * 1.5); // Bounce to other side
-                } else if (boss.behavior === 'CHARGING') { // Don't get stuck on wall during charge
-                    boss.angle = Math.PI - boss.angle; // Reflect angle
+                     boss.targetX = (boss.x <= W / 2) ? (W - boss.size * 1.5) : (boss.size * 1.5);
+                } else if (boss.behavior === 'CHARGING') { 
+                    boss.angle = Math.PI - boss.angle;
                 }
             }
 
@@ -984,7 +1122,7 @@
             let baseSpeed = (1.5 + Math.random() + gameState.level * 0.1);
 
             const minion = {
-                id: 'minion_' + Date.now() + Math.random(), // Date.now() for unique ID is fine
+                id: 'minion_' + Date.now() + Math.random(),
                 x: boss.x + Math.cos(angleFromBoss) * spawnDist,
                 y: boss.y + Math.sin(angleFromBoss) * spawnDist,
                 size: size,
@@ -1361,7 +1499,7 @@
                 particle.vx = Math.cos(angle) * speed;
                 particle.vy = Math.sin(angle) * speed;
                 particle.life = 25 + Math.random() * 25;
-                particle.maxLife = 50; // Use a fixed maxLife or one based on initial life for consistency
+                particle.maxLife = 50; 
                 particle.size = Math.random() * 2 + 1 + sizeFactor * 0.05;
                 particle.color = `hsl(${baseColorHue + (Math.random() - 0.5) * 60}, 100%, ${55 + Math.random() * 35}%)`;
                 
@@ -1409,9 +1547,9 @@
             let engineColor = '#ff4757'; 
 
             if (player.isGhost) {
-                ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 100) * 0.2; // Date.now() for visual effect is fine
+                ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 100) * 0.2;
                 playerColor = ABILITY_COLORS.ghost;
-            } else if (activeAbility && Date.now() < activeAbility.endTime) { // Date.now() for visual effect
+            } else if (activeAbility && Date.now() < activeAbility.endTime) {
                 playerColor = ABILITY_COLORS[activeAbility.type] || playerColor;
                  if (activeAbility.type === 'rapidFire') engineColor = '#FFA500'; 
             }
@@ -1455,7 +1593,7 @@
             ctx.shadowBlur = 0; 
             ctx.globalAlpha = 1.0; 
 
-            if (activeAbility && activeAbility.type === 'shield' && Date.now() < activeAbility.endTime) { // Date.now() for visual
+            if (activeAbility && activeAbility.type === 'shield' && Date.now() < activeAbility.endTime) {
                 drawShield(player.size);
             }
             ctx.restore();
@@ -1622,7 +1760,7 @@
             } else if (hex.length == 7) { 
                 r = parseInt(hex[1] + hex[2], 16); g = parseInt(hex[3] + hex[4], 16); b = parseInt(hex[5] + hex[6], 16);
             } else { 
-                 return {r:160, g:160, b:255}; // Default if format is unexpected
+                 return {r:160, g:160, b:255};
             }
             return { r, g, b };
         }
@@ -1641,7 +1779,7 @@
                        ctx.fillStyle = `hsla(0, 0%, 100%, ${alpha})`; 
                     }
                 } else { 
-                    ctx.fillStyle = p.color; // Should not happen if color is always HSL
+                    ctx.fillStyle = p.color;
                 }
                 ctx.fill();
             });
@@ -1652,7 +1790,7 @@
             const zoneY = H - DANGER_ZONE_HEIGHT;
             
             ctx.save();
-            const alpha = 0.2 + Math.sin(Date.now() / 200) * 0.15; // Date.now() for visual effect is fine
+            const alpha = 0.2 + Math.sin(Date.now() / 200) * 0.15;
             ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
             ctx.fillRect(0, zoneY, W, DANGER_ZONE_HEIGHT);
 
@@ -1846,12 +1984,12 @@
         function playerEmergeSequenceLoop(targetY) {
             ctx.clearRect(0, 0, W, H);
             
-            gameState.player.y -= 4; // Constant speed for simplicity, could be time-based
+            gameState.player.y -= 4;
             if (gameState.player.y < targetY) {
                 gameState.player.y = targetY;
             }
             
-            gameState.player.thrusterSize = gameState.player.size * (0.8 + Math.sin(Date.now()/50) * 0.2); // Date.now() visual fine
+            gameState.player.thrusterSize = gameState.player.size * (0.8 + Math.sin(Date.now()/50) * 0.2);
             gameState.player.lastMoveDir = {x:0, y:-1};
 
             drawPlayer();
@@ -1869,6 +2007,7 @@
                 gameState.running = true;
                 gameState.paused = false;
                 pauseTextEl.classList.add('hidden');
+                if (pauseBtn) pauseBtn.textContent = '||';
                 gameState.lastTime = performance.now();
                 if (musicEnabled && audioContext) startBackgroundMusic();
                 animationFrameId = requestAnimationFrame(gameLoop);
@@ -1903,6 +2042,7 @@
                 gameState.running = true;
                 gameState.paused = false;
                 pauseTextEl.classList.add('hidden');
+                if (pauseBtn) pauseBtn.textContent = '||';
                 gameState.lastTime = performance.now();
                 if (musicEnabled && audioContext) startBackgroundMusic();
                 animationFrameId = requestAnimationFrame(gameLoop);
@@ -1952,26 +2092,22 @@
             updateHighScoreDisplay(); 
             
             gameOverScreen.classList.remove('hidden');
+            if (pauseBtn) pauseBtn.textContent = '||'; // Reset pause button
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
         }
         
-        function gameLoop(timestamp) { // timestamp is provided by requestAnimationFrame
+        function gameLoop(timestamp) {
             if (!gameState.running) {
                  animationFrameId = null; 
                  return;
             }
             if (gameState.paused) {
-                // If paused, we don't request another frame until unpaused
                 return; 
             }
 
-            const currentTime = timestamp; // Use timestamp for more accurate timing if needed, or Date.now()
-                                         // For simplicity and current structure, using Date.now() internally for most things.
-                                         // Or pass `currentTime` or `deltaTime` to update functions.
-                                         // Let's stick with Date.now() for this iteration for consistency with existing logic.
             const now = Date.now();
 
 
@@ -1979,19 +2115,18 @@
             updateBullets();
             updateAsteroids(now);
             if (gameState.bossActive) updateBoss(now); 
-            if (!gameState.running) return; // Boss update might end game
+            if (!gameState.running) return;
 
-            updateAbilityCapsules(); // Uses its own Math.random for spawn, not time critical for updates
+            updateAbilityCapsules();
             updateActiveAbility(now);
-            updateMultiplier(); // Time based via frame count (timeSinceLastHit)
+            updateMultiplier(); 
             updateLevel(); 
             checkCollisions(now); 
-            if (!gameState.running) return; // Collisions might end game
+            if (!gameState.running) return;
 
             updateParticles();
             updateScreenShake();
             
-            // Drawing
             ctx.clearRect(0, 0, W, H);
             ctx.save();
             ctx.translate(gameState.camera.x, gameState.camera.y);
@@ -2006,7 +2141,7 @@
             ctx.restore(); 
             updateUI(now);
             
-            gameState.lastTime = now; // Store time for next frame's deltaTime calculation (if used more extensively)
+            gameState.lastTime = now;
             animationFrameId = requestAnimationFrame(gameLoop);
         }
 
@@ -2020,7 +2155,6 @@
                 const playerTopExtent = gameState.player.size;
                 const playerBottomExtent = gameState.player.size * 0.6;
 
-                // Recenter player if game not running, or adjust if it is.
                 if(!gameState.running){
                     gameState.player.x = W / 2;
                 } else {
@@ -2035,7 +2169,6 @@
                 }
                 gameState.player.y = Math.max(playerTopExtent, Math.min(H - playerBottomExtent, gameState.player.y));
             }
-            // If boss exists, adjust its target positions if they are screen relative
             if (gameState.bossData) {
                 if (gameState.bossData.targetX > W - gameState.bossData.size) gameState.bossData.targetX = W - gameState.bossData.size * 1.5;
                 if (gameState.bossData.targetY > H * 0.5) gameState.bossData.targetY = H * 0.4;
@@ -2056,6 +2189,7 @@
             updateHighScoreDisplay();
             startScreen.classList.remove('hidden');
             gameOverScreen.classList.add('hidden');
+            if (pauseBtn) pauseBtn.textContent = '||';
             if (!menuAnimationFrameId) {
                  menuAnimationLoop();
             }
