@@ -3,12 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Awesome Games Arcade</title>
+    <title>Galactic Games Arcade</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Roboto:wght@300;400&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-color: #0f0f1b;
+            --primary-glow: #00ffff;
+            --secondary-glow: #ff00ff;
+            --text-color: #e0e0e0;
+            --card-bg: rgba(26, 26, 46, 0.5);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --font-title: 'Orbitron', sans-serif;
+            --font-body: 'Roboto', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            cursor: none; /* Hide default cursor */
+        }
+
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: #1a1a2e; /* Dark space theme */
-            color: #ffffff;
+            font-family: var(--font-body);
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 0;
             display: flex;
@@ -16,127 +35,348 @@
             align-items: center;
             min-height: 100vh;
             text-align: center;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+        }
+
+        /* --- Dynamic Background Canvas --- */
+        #starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        
+        /* --- Custom Cursor --- */
+        .custom-cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--primary-glow);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: width 0.2s, height 0.2s, background-color 0.2s;
+            z-index: 9999;
+        }
+        
+        body:hover .custom-cursor {
+            background-color: rgba(0, 255, 255, 0.2);
+        }
+
+        a:hover ~ .custom-cursor, .game-card:hover ~ .custom-cursor {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 0, 255, 0.3);
+            border-color: var(--secondary-glow);
         }
 
         header {
-            padding: 40px 20px 20px;
+            padding: 60px 20px 30px;
+            opacity: 0;
+            transform: translateY(-20px);
+            animation: fadeInDown 1s 0.2s forwards;
         }
 
         header h1 {
-            font-size: 3em;
+            font-family: var(--font-title);
+            font-size: 4em;
+            font-weight: 700;
             margin-bottom: 10px;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            background: linear-gradient(45deg, var(--secondary-glow), var(--primary-glow));
             background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.3), 0 0 25px rgba(255, 0, 255, 0.3);
         }
 
         header p {
             font-size: 1.2em;
-            color: #cccccc;
+            color: var(--text-color);
+            font-weight: 300;
         }
 
         .games-grid {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 30px;
+            gap: 40px;
             padding: 20px;
             max-width: 1200px;
             margin: 20px auto;
         }
-
+        
         .game-card {
-            background-color: #2a2a3e;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            background: var(--card-bg);
+            border-radius: 15px;
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px); /* For Safari */
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             overflow: hidden;
-            width: 280px;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            text-decoration: none; /* Remove underline from link */
-            color: inherit; /* Inherit text color */
+            width: 300px;
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+            transform-style: preserve-3d;
+            will-change: transform;
+            transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
+
+            /* For reveal animation */
+            opacity: 0;
+            transform: scale(0.9);
+            animation: popIn 0.6s forwards;
         }
 
+        .game-card:nth-child(2) { animation-delay: 0.2s; }
+        .game-card:nth-child(3) { animation-delay: 0.4s; }
+        /* Add more delays if you have more cards */
+        
+        .game-card::before { /* Animated glowing border */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 15px;
+            border: 2px solid transparent;
+            background: linear-gradient(45deg, var(--secondary-glow), var(--primary-glow)) border-box;
+            mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: destination-out;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        
         .game-card:hover {
-            transform: translateY(-5px) scale(1.02);
-            box-shadow: 0 10px 25px rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5), 0 0 50px rgba(255, 0, 255, 0.5);
+        }
+
+        .game-card:hover::before {
+            opacity: 1;
         }
 
         .game-card img.thumbnail {
             width: 100%;
             height: 180px;
-            object-fit: cover; /* Ensures image covers the area, might crop */
-            border-bottom: 2px solid #4ecdc4;
+            object-fit: cover;
+            border-bottom: 1px solid var(--card-border);
+            transition: transform 0.4s ease;
+        }
+        
+        .game-card:hover img.thumbnail {
+            transform: scale(1.05);
+        }
+
+        .img-placeholder {
+            width: 100%;
+            height: 180px;
+            background-color: rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid var(--card-border);
+            font-family: var(--font-title);
+            font-size: 1.5em;
+            color: var(--primary-glow);
+            text-shadow: 0 0 5px var(--primary-glow);
         }
 
         .game-card .game-info {
-            padding: 15px;
+            padding: 20px;
+            transform: translateZ(20px); /* Pushes content forward in 3D space */
         }
 
         .game-card h3 {
-            font-size: 1.5em;
-            margin-top: 0;
-            margin-bottom: 10px;
-            color: #00ffff;
+            font-family: var(--font-title);
+            font-size: 1.7em;
+            margin: 0 0 10px;
+            color: #ffffff;
+            font-weight: 500;
         }
 
         .game-card p {
-            font-size: 0.9em;
-            color: #bbbbbb;
-            line-height: 1.4;
+            font-size: 1em;
+            color: var(--text-color);
+            line-height: 1.5;
+            font-weight: 300;
         }
 
         footer {
-            margin-top: auto; /* Pushes footer to the bottom */
+            margin-top: auto;
             padding: 20px;
             font-size: 0.9em;
             color: #888888;
+            opacity: 0;
+            animation: fadeIn 1s 1s forwards;
+        }
+
+        /* --- Animations --- */
+        @keyframes fadeInDown {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes popIn {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        
+        /* --- Responsive Design --- */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 3em;
+            }
+            .games-grid {
+                flex-direction: column;
+                align-items: center;
+            }
+            .game-card {
+                width: 90vw;
+                max-width: 320px;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Dynamic Background & Custom Cursor -->
+    <canvas id="starfield"></canvas>
+    <div class="custom-cursor"></div>
+
     <header>
-        <h1>Awesome Games Arcade</h1>
-        <p>Choose your adventure from our collection of exciting games!</p>
+        <h1>Galactic Games Arcade</h1>
+        <p>Choose your adventure from our collection of cosmic challenges!</p>
     </header>
 
     <main class="games-grid">
         <a href="asteroid_game.html" class="game-card">
-            <img src="asteroid_game_thumbnail.png" alt="Asteroid Dodge Game Thumbnail" class="thumbnail" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#333'; this.parentElement.insertAdjacentHTML('afterbegin', '<div style=\'width:100%; height:180px; background-color:#333; display:flex; align-items:center; justify-content:center; border-bottom: 2px solid #4ecdc4;\'><span style=\'color:#fff; font-size:1.2em;\'>Asteroid Dodge</span></div>');">
+            <img src="asteroid_game_thumbnail.png" alt="Asteroid Dodge" class="thumbnail" onerror="handleImageError(this)">
             <div class="game-info">
                 <h3>Asteroid Dodge</h3>
                 <p>Navigate the cosmos, shoot asteroids, and survive the onslaught!</p>
             </div>
         </a>
 
-        <!-- New Ludo Game Card -->
         <a href="ludo.html" class="game-card">
-            <img src="ludo_game_thumbnail.png" alt="Ludo Game Thumbnail" class="thumbnail" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#333'; this.parentElement.insertAdjacentHTML('afterbegin', '<div style=\'width:100%; height:180px; background-color:#333; display:flex; align-items:center; justify-content:center; border-bottom: 2px solid #4ecdc4;\'><span style=\'color:#fff; font-size:1.2em;\'>Ludo</span></div>');">
+            <img src="ludo_game_thumbnail.png" alt="Ludo Classic" class="thumbnail" onerror="handleImageError(this)">
             <div class="game-info">
                 <h3>Ludo Classic</h3>
                 <p>Roll the dice and race your tokens to home in this timeless board game!</p>
             </div>
         </a>
 
-        <!-- Add more game cards here as you develop them -->
-        <!--
-        <a href="another_game.html" class="game-card">
-            <img src="another_game_thumbnail.png" alt="Another Game Thumbnail" class="thumbnail" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#333';">
+        <!-- Example of a third card with animation delay -->
+        <!-- 
+        <a href="#" class="game-card">
+            <img src="third_game_thumbnail.png" alt="Space Invaders" class="thumbnail" onerror="handleImageError(this)">
             <div class="game-info">
-                <h3>Another Cool Game</h3>
-                <p>Description of your other cool game.</p>
+                <h3>Space Invaders</h3>
+                <p>Defend the Earth from waves of descending alien attackers!</p>
             </div>
         </a>
         -->
     </main>
 
     <footer>
-        <p>© <span id="currentYear"></span> Your Arcade Name. All rights reserved.</p>
+        <p>© <span id="currentYear"></span> Galactic Games Arcade. All rights reserved.</p>
     </footer>
 
     <script>
+        // --- Set Current Year in Footer ---
         document.getElementById('currentYear').textContent = new Date().getFullYear();
+        
+        // --- Starfield Background ---
+        const canvas = document.getElementById('starfield');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const stars = [];
+        const numStars = 200;
+
+        for (let i = 0; i < numStars; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: Math.random() * 1.5,
+                alpha: Math.random(),
+                speed: Math.random() * 0.2 + 0.1
+            });
+        }
+
+        function drawStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+                ctx.fill();
+                
+                star.y -= star.speed;
+                if (star.y < 0) {
+                    star.y = canvas.height;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+            requestAnimationFrame(drawStars);
+        }
+        drawStars();
+
+        // --- 3D Card Tilt Effect ---
+        const cards = document.querySelectorAll('.game-card');
+        cards.forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+
+                const rotateX = (y - centerY) / 20; // Lower divisor for more tilt
+                const rotateY = (centerX - x) / 20;
+
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
+            });
+        });
+        
+        // --- Custom Cursor ---
+        const cursor = document.querySelector('.custom-cursor');
+        window.addEventListener('mousemove', e => {
+            cursor.style.top = `${e.clientY}px`;
+            cursor.style.left = `${e.clientX}px`;
+        });
+        
+        // --- Image Error Handling ---
+        function handleImageError(img) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'img-placeholder';
+            placeholder.textContent = img.alt || 'Game Image'; // Use alt text for placeholder
+            img.parentElement.insertBefore(placeholder, img);
+            img.style.display = 'none';
+        }
     </script>
 </body>
 </html>
