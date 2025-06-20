@@ -551,10 +551,10 @@
                 console.warn('Web Audio API not supported');
                 musicEnabled = false;
                 sfxEnabled = false;
-                musicToggleBtn.disabled = true;
-                sfxToggleBtn.disabled = true;
-                musicToggleBtn.textContent = 'Music: N/A';
-                sfxToggleBtn.textContent = 'SFX: N/A';
+                if (musicToggleBtn) musicToggleBtn.disabled = true;
+                if (sfxToggleBtn) sfxToggleBtn.disabled = true;
+                if (musicToggleBtn) musicToggleBtn.textContent = 'Music: N/A';
+                if (sfxToggleBtn) sfxToggleBtn.textContent = 'SFX: N/A';
             }
         }
         function createOscillator(frequency, type = 'sine', duration = 0.1, volume = 0.1) { 
@@ -688,7 +688,11 @@
         function checkAndSetHighScore() {
             if (gameState.score > highScore) {
                 highScore = gameState.score;
-                localStorage.setItem('asteroidDodgeHighScore', highScore);
+                try {
+                    localStorage.setItem('asteroidDodgeHighScore', highScore);
+                } catch (e) {
+                    console.warn("Could not save high score to localStorage:", e);
+                }
                 updateHighScoreDisplay(); 
             }
         }
@@ -869,33 +873,31 @@
             let isActivelyMovingViaPointer = false;
 
             if (isPointerActive && pointerTargetX !== null && pointerTargetY !== null) {
-                const targetDist = Math.hypot(pointerTargetX - player.x, pointerTargetY - player.y);
-                const moveThreshold = player.size * 0.1; // Small threshold to start moving
+                const targetDistX = pointerTargetX - player.x;
+                const targetDistY = pointerTargetY - player.y;
+                const targetDist = Math.hypot(targetDistX, targetDistY);
+                const moveThreshold = player.size * 0.1; 
 
                 if (targetDist > moveThreshold) {
-                    deltaX = (pointerTargetX - player.x);
-                    deltaY = (pointerTargetY - player.y);
-
-                    const len = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                    if (len > 0) {
-                        // Move player at its speed, but don't overshoot target
-                        const moveStepX = (deltaX / len) * player.speed;
-                        const moveStepY = (deltaY / len) * player.speed;
-                        if (Math.abs(moveStepX) > Math.abs(deltaX)) deltaX = deltaX; else deltaX = moveStepX;
-                        if (Math.abs(moveStepY) > Math.abs(deltaY)) deltaY = deltaY; else deltaY = moveStepY;
+                    if (targetDist <= player.speed) { // If target is closer than one step, move directly to it
+                        deltaX = targetDistX;
+                        deltaY = targetDistY;
+                    } else { // Move at player.speed towards target
+                        deltaX = (targetDistX / targetDist) * player.speed;
+                        deltaY = (targetDistY / targetDist) * player.speed;
                     }
                     isActivelyMovingViaPointer = true;
                 }
                 
                 // For thruster direction (approximate from delta before normalization)
-                if (deltaX < -0.1) movedX = -1; else if (deltaX > 0.1) movedX = 1; else movedX = 0;
-                if (deltaY < -0.1) movedY = -1; else if (deltaY > 0.1) movedY = 1; else movedY = 0;
+                if (deltaX < -0.01) movedX = -1; else if (deltaX > 0.01) movedX = 1; else movedX = 0;
+                if (deltaY < -0.01) movedY = -1; else if (deltaY > 0.01) movedY = 1; else movedY = 0;
 
             } else { // Keyboard controls
                 if (keys['ArrowLeft'] || keys['KeyA']) { deltaX -= player.speed; movedX = -1; }
-                if (keys['ArrowRight'] || keys['KeyD']) { deltaX += player.speed; movedX = (movedX === -1 && deltaX === 0) ? 0 : 1; } // Fix potential conflict
+                if (keys['ArrowRight'] || keys['KeyD']) { deltaX += player.speed; movedX = (movedX === -1 && deltaX === 0) ? 0 : 1; } 
                 if (keys['ArrowUp'] || keys['KeyW']) { deltaY -= player.speed; movedY = -1; }
-                if (keys['ArrowDown'] || keys['KeyS']) { deltaY += player.speed; movedY = (movedY === -1 && deltaY === 0) ? 0 : 1; } // Fix potential conflict
+                if (keys['ArrowDown'] || keys['KeyS']) { deltaY += player.speed; movedY = (movedY === -1 && deltaY === 0) ? 0 : 1; } 
                 
                 if (deltaX !== 0 && deltaY !== 0) { // Diagonal speed correction for keyboard
                     const factor = 1 / Math.sqrt(2);
@@ -918,10 +920,10 @@
 
             // Shooting logic
             let shouldShoot = false;
-            if (isActivelyMovingViaPointer) { // Auto-shoot if actively moving via pointer
+            if (isActivelyMovingViaPointer) { 
                  shouldShoot = true;
             }
-            if (keys['Space']) { // Keyboard shoot
+            if (keys['Space']) { 
                 shouldShoot = true;
             }
 
@@ -1177,7 +1179,14 @@
                 if (boss.behavior === 'SWEEPING' || boss.behavior === 'ENTERING') {
                      boss.targetX = (boss.x <= W / 2) ? (W - boss.size * 1.5) : (boss.size * 1.5);
                 } else if (boss.behavior === 'CHARGING') { 
-                    boss.angle = Math.PI - boss.angle;
+                    boss.angle = Math.PI - boss.angle; // Simple reflection
+                    // Ensure the boss doesn't get stuck by also potentially adjusting targetY or behavior
+                     if (boss.chargeTargetX <= boss.size * 0.7 || boss.chargeTargetX >= W - boss.size * 0.7) {
+                        // If charge target was also near the wall, redirect more centrally or switch behavior
+                        boss.chargeTargetX = W / 2;
+                        boss.chargeTargetY = H * 0.3; // Aim higher to recover
+                        if(boss.behaviorTimer > 500) boss.behaviorTimer = 500; // shorten charge if bounced
+                    }
                 }
             }
 
@@ -1266,11 +1275,12 @@
                     gameState.nearMissCooldowns.set(asteroid.id, currentTime + cooldownDuration);
                 }
             });
-            for (const [id, time] of gameState.nearMissCooldowns.entries()) {
-                if (currentTime > time) {
-                    gameState.nearMissCooldowns.delete(id);
-                }
-            }
+            // Cleanup old cooldowns (optional, as they are checked anyway)
+            // for (const [id, time] of gameState.nearMissCooldowns.entries()) {
+            //     if (currentTime > time) {
+            //         gameState.nearMissCooldowns.delete(id);
+            //     }
+            // }
         }
 
         function showNearMissIndicator(x, y, text) {
@@ -1278,9 +1288,12 @@
             indicator.className = 'near-miss-indicator';
             indicator.textContent = text;
             const gameRect = gameContainer.getBoundingClientRect();
-            indicator.style.left = (x - gameRect.left) + 'px';
+            indicator.style.left = (x - gameRect.left) + 'px'; // Ensure relative to gameContainer
             indicator.style.top = (y - gameRect.top) + 'px';
-            gameContainer.appendChild(indicator);
+            uiOverlay = document.querySelector('.ui-overlay'); // Add to UI overlay or game container
+            if (uiOverlay) uiOverlay.appendChild(indicator); // Add to UI overlay so it's above canvas but respects overlay structure
+            else gameContainer.appendChild(indicator); // Fallback to gameContainer
+            
             setTimeout(() => indicator.remove(), 1000);
         }
 
@@ -1322,7 +1335,7 @@
 
             deactivateCurrentAbilityVisualsAndLogicOnly(); 
 
-            const currentActualShootCooldown = gameState.shootCooldown;
+            const currentActualShootCooldown = gameState.shootCooldown; // Could be default or rapid fire
 
             if (newAbilityType === 'rapidFire') {
                 gameState.activeAbility = { type: 'rapidFire', endTime: newEndTime, originalCooldown: currentActualShootCooldown };
@@ -1341,7 +1354,7 @@
                 gameState.activeAbility = { type: newAbilityType, endTime: newEndTime };
                 gameState.player.isGhost = true;
             }
-            else { 
+            else { // For shield, doubleLaser
                 gameState.activeAbility = { type: newAbilityType, endTime: newEndTime };
             }
 
@@ -1352,6 +1365,7 @@
         function deactivateCurrentAbilityVisualsAndLogicOnly() {
             if (gameState.activeAbility) {
                 if (gameState.activeAbility.type === 'rapidFire') {
+                    // Restore to the cooldown that was active *before* rapid fire started
                     gameState.shootCooldown = gameState.activeAbility.originalCooldown || gameState.defaultShootCooldown;
                 } else if (gameState.activeAbility.type === 'timeSlow') { 
                     gameState.isTimeSlowActive = false;
@@ -1365,6 +1379,7 @@
                 } else if (gameState.activeAbility.type === 'ghost') { 
                     gameState.player.isGhost = false;
                 }
+                // Shield and DoubleLaser don't need special logic here, just visual removal handled by activeAbility being null
             }
         }
 
@@ -1397,11 +1412,12 @@
 
         function updateMultiplier() { 
             gameState.timeSinceLastHit++;
-            const multiplierResetTime = 240; 
+            const multiplierResetTime = 240; // Approx 4 seconds at 60fps
             if (gameState.timeSinceLastHit > multiplierResetTime) {
                 gameState.consecutiveHits = 0;
                 gameState.multiplier = 1;
             }
+            // Multiplier increases every 3 consecutive hits
             gameState.multiplier = Math.min(8, Math.floor(gameState.consecutiveHits / 3) + 1); 
             gameState.maxMultiplier = Math.max(gameState.maxMultiplier, gameState.multiplier);
         }
@@ -1432,7 +1448,7 @@
         function triggerScreenFlash() {
             const flash = document.createElement('div');
             flash.className = 'screen-flash';
-            gameContainer.appendChild(flash);
+            gameContainer.appendChild(flash); // Add to gameContainer so it's behind UI_overlay potentially
             setTimeout(() => flash.remove(), 300);
         }
 
@@ -1448,6 +1464,7 @@
                 const dy = player.y - asteroid.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
+                // Player vs Asteroid/Boss collision
                 if (distance < player.size * 0.8 + asteroid.size * 0.7) { 
                     if (player.isGhost) {
                         createExplosion(player.x, player.y, ABILITY_EXPLOSION_HUES.ghost, player.size * 0.5);
@@ -1458,7 +1475,7 @@
                     triggerScreenFlash(); 
                     playHitSound();
                     
-                    if (gameState.bossData && asteroid.id === gameState.bossData.id) {
+                    if (gameState.bossData && asteroid.id === gameState.bossData.id) { // Collision with Boss
                         if (gameState.activeAbility && gameState.activeAbility.type === 'shield' && currentTime < gameState.activeAbility.endTime) {
                             deactivateCurrentAbility(currentTime);
                             createExplosion(player.x, player.y, ABILITY_EXPLOSION_HUES.shield, player.size * 2);
@@ -1469,17 +1486,17 @@
                             endGame('crushed_by_boss');
                             return; 
                         }
-                    } else {
+                    } else { // Collision with regular asteroid or minion
                         createExplosion(asteroid.x, asteroid.y, 25, asteroid.size * 0.7); 
                         gameState.asteroids.splice(i, 1); 
-                        gameState.nearMissCooldowns.delete(asteroid.id);
+                        if(gameState.nearMissCooldowns) gameState.nearMissCooldowns.delete(asteroid.id);
                         
                         if (gameState.activeAbility && gameState.activeAbility.type === 'shield' && currentTime < gameState.activeAbility.endTime) {
                             deactivateCurrentAbility(currentTime);
                             createExplosion(player.x, player.y, ABILITY_EXPLOSION_HUES.shield, player.size * 2); 
                         } else {
                             gameState.health--;
-                            gameState.consecutiveHits = 0;
+                            gameState.consecutiveHits = 0; // Reset multiplier on taking damage
                             gameState.multiplier = 1;
                             if (gameState.health <= 0) {
                                 endGame('player_defeated'); 
@@ -1491,6 +1508,7 @@
             }
             if (!gameState.running) return; 
             
+            // Bullet vs Asteroid/Boss collision
             for (let bulletIndex = gameState.bullets.length - 1; bulletIndex >= 0; bulletIndex--) {
                 const bullet = gameState.bullets[bulletIndex];
                 if (!bullet) continue; 
@@ -1508,22 +1526,22 @@
                         asteroid.health = (asteroid.health || 1) - 1;
                         asteroid.damageLevel++; 
                         
-                        if (gameState.bossData && asteroid.id === gameState.bossData.id) {
+                        if (gameState.bossData && asteroid.id === gameState.bossData.id) { // Bullet hits Boss
                             playBossHitSound();
                             createExplosion(bullet.x, bullet.y, 10, asteroid.size * 0.1); 
                             gameState.bossData.damageLevel = Math.floor((1 - (gameState.bossData.health / gameState.bossData.maxHealth)) * 5);
                             gameState.bossData.y -= NUDGE_PER_HIT;
                             gameState.bossData.y = Math.max(-gameState.bossData.size * 0.5, gameState.bossData.y); 
-
-                        } else {
+                            // Boss health reduces, defeat handled in updateBoss
+                        } else { // Bullet hits regular asteroid or minion
                              createExplosion(asteroid.x, asteroid.y, 25, asteroid.size * 0.3); 
                         }
 
                         if (asteroid.health <= 0) {
-                            if (!gameState.bossData || asteroid.id !== gameState.bossData.id) { 
+                            if (!gameState.bossData || asteroid.id !== gameState.bossData.id) { // Not the boss itself being destroyed here
                                 createExplosion(asteroid.x, asteroid.y, 35, asteroid.size * 0.8); 
                                 gameState.asteroids.splice(asteroidIndex, 1);
-                                gameState.nearMissCooldowns.delete(asteroid.id);
+                                if(gameState.nearMissCooldowns) gameState.nearMissCooldowns.delete(asteroid.id);
                                 gameState.asteroidsDestroyed++;
                                 gameState.consecutiveHits++;
                                 gameState.timeSinceLastHit = 0;
@@ -1531,14 +1549,15 @@
                                 gameState.score += baseScore * gameState.multiplier;
                                 playExplosionSound();
                             }
-                        } else if (!gameState.bossData || asteroid.id !== gameState.bossData.id) { 
+                        } else if (!gameState.bossData || asteroid.id !== gameState.bossData.id) { // Hit but not destroyed (non-boss)
                             playHitSound(); 
                         }
-                        break; 
+                        break; // Bullet hits one asteroid, then is gone
                     }
                 }
             }
 
+            // Bullet vs Ability Capsule collision
             for (let bulletIndex = gameState.bullets.length - 1; bulletIndex >= 0; bulletIndex--) {
                 const bullet = gameState.bullets[bulletIndex];
                 if (!bullet) continue; 
@@ -1547,10 +1566,11 @@
                     const capsule = gameState.abilityCapsules[capsuleIndex];
                     if (!capsule) continue;
 
+                    // Simple AABB for bullet (tall rectangle) vs Circle for capsule
                     const bulletRect = {
                         left: bullet.x - bullet.size / 2,
                         right: bullet.x + bullet.size / 2,
-                        top: bullet.y - 10, 
+                        top: bullet.y - 10, // Bullet visual length
                         bottom: bullet.y + 10
                     };
                     const capsuleCircle = {
@@ -1559,6 +1579,7 @@
                         radius: capsule.size
                     };
 
+                    // Find closest point in/on bullet rect to capsule center
                     const closestX = Math.max(bulletRect.left, Math.min(capsuleCircle.x, bulletRect.right));
                     const closestY = Math.max(bulletRect.top, Math.min(capsuleCircle.y, bulletRect.bottom));
 
@@ -1567,7 +1588,7 @@
                     const distanceSquared = (distX * distX) + (distY * distY);
 
                     if (distanceSquared < (capsuleCircle.radius * capsuleCircle.radius)) {
-                        createExplosion(capsule.x, capsule.y, ABILITY_EXPLOSION_HUES[capsule.type], capsule.size * 2);
+                        createExplosion(capsule.x, capsule.y, ABILITY_EXPLOSION_HUES[capsule.type] || 200, capsule.size * 2);
                         gameState.bullets.splice(bulletIndex, 1);
                         gameState.abilityCapsules.splice(capsuleIndex, 1);
                         activateAbility(capsule.type, currentTime);
@@ -1589,7 +1610,7 @@
                 particle.vx = Math.cos(angle) * speed;
                 particle.vy = Math.sin(angle) * speed;
                 particle.life = 25 + Math.random() * 25;
-                particle.maxLife = 50; 
+                particle.maxLife = 50; // Reference for opacity calculation
                 particle.size = Math.random() * 2 + 1 + sizeFactor * 0.05;
                 particle.color = `hsl(${baseColorHue + (Math.random() - 0.5) * 60}, 100%, ${55 + Math.random() * 35}%)`;
                 
@@ -1605,7 +1626,7 @@
                 p.x += p.vx;
                 p.y += p.vy;
                 p.life--;
-                p.vx *= 0.95;
+                p.vx *= 0.95; // Air resistance
                 p.vy *= 0.95;
                 if (p.life > 0) {
                     activeParticles.push(p);
@@ -1661,17 +1682,17 @@
                 ctx.shadowBlur = 10;
                 ctx.beginPath();
 
-                if(player.lastMoveDir.y < 0) { 
+                if(player.lastMoveDir.y < 0) { // Moving mostly up
                     ctx.moveTo(0, thrusterBaseY);
                     ctx.lineTo(-player.size * 0.4, thrusterBaseY + player.thrusterSize);
                     ctx.lineTo(player.size * 0.4, thrusterBaseY + player.thrusterSize);
-                } else if (player.lastMoveDir.x !== 0 && player.lastMoveDir.y === 0) { 
-                    const thrusterOffsetX = player.lastMoveDir.x * player.size * 0.3;
-                    const flameDirectionX = -player.lastMoveDir.x; 
-                    ctx.moveTo(thrusterOffsetX, thrusterBaseY * 0.5); 
+                } else if (player.lastMoveDir.x !== 0 && player.lastMoveDir.y === 0) { // Moving horizontally
+                    const thrusterOffsetX = player.lastMoveDir.x * player.size * 0.3; // Thruster on opposite side of movement
+                    const flameDirectionX = -player.lastMoveDir.x; // Flame points away from movement
+                    ctx.moveTo(thrusterOffsetX, thrusterBaseY * 0.5); // Mid-point of ship side
                     ctx.lineTo(thrusterOffsetX + flameDirectionX * player.thrusterSize * 0.7, thrusterBaseY * 0.5 - player.thrusterSize * 0.3);
                     ctx.lineTo(thrusterOffsetX + flameDirectionX * player.thrusterSize * 0.7, thrusterBaseY * 0.5 + player.thrusterSize * 0.3);
-                } else { 
+                } else { // Default or moving down (less common for main thruster) or pointer drag with flicker
                     ctx.moveTo(0, thrusterBaseY);
                     ctx.lineTo(-player.size * 0.3, thrusterBaseY + player.thrusterSize * 0.7);
                     ctx.lineTo(player.size * 0.3, thrusterBaseY + player.thrusterSize * 0.7);
@@ -1709,6 +1730,7 @@
                 ctx.fillStyle = '#33FF33'; 
                 ctx.shadowColor = '#33FF33';
                 ctx.beginPath(); ctx.rect(bullet.x - bullet.size / 2, bullet.y - 10, bullet.size, 20); ctx.fill();
+                // Inner brighter core for laser effect
                 ctx.fillStyle = '#BBFFBB';
                 ctx.beginPath(); ctx.rect(bullet.x - bullet.size / 4, bullet.y - 8, bullet.size / 2, 16); ctx.fill();
             });
@@ -1721,7 +1743,7 @@
                 ctx.translate(asteroid.x, asteroid.y);
                 ctx.rotate(asteroid.rotation);
                 
-                if (asteroid === hitterAsteroid) { 
+                if (asteroid === hitterAsteroid) { // Special glow for menu asteroid hitting button
                     ctx.shadowColor = 'rgba(255,150,50,0.9)';
                     ctx.shadowBlur = 40;
                 }
@@ -1746,24 +1768,26 @@
                 ctx.lineWidth = (gameState.bossData && asteroid.id === gameState.bossData.id && !asteroid.isMenu) ? 3 : (asteroid.isBossComponent && !asteroid.isMenu ? 2 : 1.5);
                 ctx.stroke();
 
+                // Draw damage cracks on non-boss asteroids
                 if (asteroid.damageLevel > 0 && !asteroid.isBossComponent && !asteroid.isMenu && (!gameState.bossData || asteroid.id !== gameState.bossData.id)) { 
                     ctx.strokeStyle = 'rgba(50, 50, 50, 0.7)';
-                    ctx.lineWidth = Math.max(1, asteroid.size / 20);
+                    ctx.lineWidth = Math.max(1, asteroid.size / 20); // Scale crack width with asteroid size
                     for (let i = 0; i < asteroid.damageLevel; i++) {
                         ctx.beginPath();
                         const startAngle = Math.random() * Math.PI * 2;
-                        const endAngle = startAngle + (Math.random() - 0.5) * Math.PI * 0.8;
+                        const endAngle = startAngle + (Math.random() - 0.5) * Math.PI * 0.8; // Random length/direction
                         const crackLength = asteroid.size * (0.4 + Math.random() * 0.4);
-                        ctx.moveTo(Math.cos(startAngle) * crackLength * 0.3, Math.sin(startAngle) * crackLength * 0.3); 
-                        ctx.lineTo(Math.cos(endAngle) * crackLength, Math.sin(endAngle) * crackLength); 
+                        ctx.moveTo(Math.cos(startAngle) * crackLength * 0.3, Math.sin(startAngle) * crackLength * 0.3); // Start near center
+                        ctx.lineTo(Math.cos(endAngle) * crackLength, Math.sin(endAngle) * crackLength); // Extend outwards
                         ctx.stroke();
                     }
                 }
+                // Draw boss health bar or damage overlay
                 if (gameState.bossData && asteroid.id === gameState.bossData.id && !asteroid.isMenu) {
                     drawBossHealthBar(asteroid);
-                     if (gameState.bossData.damageLevel > 0) {
+                     if (gameState.bossData.damageLevel > 0) { // Visual indication of damage on boss model
                         ctx.fillStyle = `rgba(255, 50, 0, ${0.05 * gameState.bossData.damageLevel})`; 
-                        ctx.fill(); 
+                        ctx.fill(); // Apply a red tint over the boss gradient
                     }
                 }
                  if (asteroid === hitterAsteroid) {
@@ -1808,15 +1832,18 @@
             const barWidth = boss.size * 1.5;
             const barHeight = 15;
             const barX = -barWidth / 2;
-            const barY = -boss.size * 0.8 - barHeight; 
+            const barY = -boss.size * 0.8 - barHeight; // Position above the boss
 
+            // Background of health bar
             ctx.fillStyle = 'rgba(50, 50, 50, 0.8)';
             ctx.fillRect(barX, barY, barWidth, barHeight);
 
+            // Health fill
             const healthPercentage = Math.max(0, boss.health / boss.maxHealth);
-            ctx.fillStyle = healthPercentage > 0.5 ? '#4CAF50' : (healthPercentage > 0.2 ? '#FFC107' : '#F44336'); 
+            ctx.fillStyle = healthPercentage > 0.5 ? '#4CAF50' : (healthPercentage > 0.2 ? '#FFC107' : '#F44336'); // Green-Yellow-Red
             ctx.fillRect(barX, barY, barWidth * healthPercentage, barHeight);
 
+            // Border for health bar
             ctx.strokeStyle = 'rgba(200, 200, 200, 0.9)';
             ctx.lineWidth = 2;
             ctx.strokeRect(barX, barY, barWidth, barHeight);
@@ -1828,28 +1855,34 @@
                 ctx.save(); ctx.translate(capsule.x, capsule.y);
                 const color = ABILITY_COLORS[capsule.type] || '#A0A0FF';
                 const symbol = ABILITY_SYMBOLS[capsule.type] || '?';
-                const pulseEffect = Math.sin(capsule.pulse) * 2;
+                const pulseEffect = Math.sin(capsule.pulse) * 2; // Pulsing size effect
+                
+                // Outer glow
                 ctx.beginPath();
                 ctx.arc(0, 0, capsule.size + pulseEffect + 2, 0, Math.PI * 2);
                 const rgbColor = hexToRgb(color);
                 ctx.fillStyle = `rgba(${rgbColor.r}, ${rgbColor.g}, ${rgbColor.b}, 0.3)`;
                 ctx.fill();
+
+                // Main capsule body
                 ctx.fillStyle = color; ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5;
                 ctx.beginPath(); ctx.arc(0, 0, capsule.size + pulseEffect, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                
+                // Symbol text
                 ctx.fillStyle = 'black'; ctx.font = `bold ${capsule.size * 1.2}px Arial`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, 0, 1); 
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, 0, 1); // Slight Y offset for better centering
                 ctx.restore();
             });
         }
         
         function hexToRgb(hex) { 
             let r = 0, g = 0, b = 0;
-            if (!hex) return {r:160, g:160, b:255}; 
-            if (hex.length == 4) { 
+            if (!hex) return {r:160, g:160, b:255}; // Default color if hex is null/undefined
+            if (hex.length == 4) { // #RGB format
                 r = parseInt(hex[1] + hex[1], 16); g = parseInt(hex[2] + hex[2], 16); b = parseInt(hex[3] + hex[3], 16);
-            } else if (hex.length == 7) { 
+            } else if (hex.length == 7) { // #RRGGBB format
                 r = parseInt(hex[1] + hex[2], 16); g = parseInt(hex[3] + hex[4], 16); b = parseInt(hex[5] + hex[6], 16);
-            } else { 
+            } else { // Fallback for invalid hex
                  return {r:160, g:160, b:255};
             }
             return { r, g, b };
@@ -1859,17 +1892,18 @@
         function drawParticles() { 
             (gameState.particles || []).forEach(p => {
                 ctx.beginPath();
+                // Particle size shrinks with life
                 ctx.arc(p.x, p.y, Math.max(0.5, p.size * (p.life / p.maxLife)) + 0.5, 0, Math.PI * 2); 
-                const alpha = Math.max(0, p.life / p.maxLife);
+                const alpha = Math.max(0, p.life / p.maxLife); // Opacity fades with life
                 if (p.color.startsWith('hsl')) {
                     const parts = p.color.match(/(\d+(\.\d+)?)/g); 
                     if (parts && parts.length >=3) {
                        ctx.fillStyle = `hsla(${parts[0]}, ${parts[1]}%, ${parts[2]}%, ${alpha})`;
-                    } else {
-                       ctx.fillStyle = `hsla(0, 0%, 100%, ${alpha})`; 
+                    } else { // Fallback if HSL parsing fails
+                       ctx.fillStyle = `hsla(0, 0%, 100%, ${alpha})`; // White particle
                     }
-                } else { 
-                    ctx.fillStyle = p.color;
+                } else { // Fallback for non-HSL colors, though current explosions use HSL
+                    ctx.fillStyle = p.color; // This won't have alpha applied directly unless color string includes it
                 }
                 ctx.fill();
             });
@@ -1880,10 +1914,11 @@
             const zoneY = H - DANGER_ZONE_HEIGHT;
             
             ctx.save();
-            const alpha = 0.2 + Math.sin(Date.now() / 200) * 0.15;
+            const alpha = 0.2 + Math.sin(Date.now() / 200) * 0.15; // Pulsing alpha
             ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
             ctx.fillRect(0, zoneY, W, DANGER_ZONE_HEIGHT);
 
+            // Line at the top of the danger zone
             ctx.strokeStyle = 'rgba(255, 50, 50, 0.6)';
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -1901,16 +1936,16 @@
             updateAbilityDisplay(currentTime); 
         }
 
-        function distSq(x1, y1, x2, y2) {
+        function distSq(x1, y1, x2, y2) { // Utility for squared distance
             return (x2 - x1)**2 + (y2 - y1)**2;
         }
         
         function generateJaggedFragmentShape(size) {
             const points = [];
-            const numVertices = 3 + Math.floor(Math.random() * 3); 
+            const numVertices = 3 + Math.floor(Math.random() * 3); // 3 to 5 vertices
             for (let i = 0; i < numVertices; i++) {
-                const angle = (i / numVertices) * Math.PI * 2 + (Math.random() - 0.5) * 0.5; 
-                const radius = size * (0.5 + Math.random() * 0.8); 
+                const angle = (i / numVertices) * Math.PI * 2 + (Math.random() - 0.5) * 0.5; // Add randomness to angle
+                const radius = size * (0.5 + Math.random() * 0.8); // Randomize radius for jaggedness
                 points.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
             }
             return points;
@@ -1920,23 +1955,23 @@
             buttonFragments = [];
             const numFragments = 10 + Math.floor(Math.random() * 6);
             const fragmentBaseSize = 25;
-            const buttonColors = ['#667eea', '#7064c2', '#764ba2', '#6a67e9', '#7352b2']; 
+            const buttonColors = ['#667eea', '#7064c2', '#764ba2', '#6a67e9', '#7352b2']; // Colors from button gradient
 
             for (let i = 0; i < numFragments; i++) {
-                const angle = (Math.PI * 2 / numFragments) * i + (Math.random() - 0.5) * 0.8; 
-                const distFromCenter = Math.random() * 15; 
+                const angle = (Math.PI * 2 / numFragments) * i + (Math.random() - 0.5) * 0.8; // Spread fragments
+                const distFromCenter = Math.random() * 15; // Start slightly offset from center
                 const initialSpeed = 1.5 + Math.random() * 2.5;
 
                 buttonFragments.push({
                     x: cx + Math.cos(angle) * distFromCenter,
                     y: cy + Math.sin(angle) * distFromCenter,
                     size: fragmentBaseSize * (0.4 + Math.random() * 0.6),
-                    vx: Math.cos(angle) * initialSpeed + (Math.random() - 0.5) * 2.5,
-                    vy: Math.sin(angle) * initialSpeed + (Math.random() * 1.0 - 0.5), 
+                    vx: Math.cos(angle) * initialSpeed + (Math.random() - 0.5) * 2.5, // Outward velocity + randomness
+                    vy: Math.sin(angle) * initialSpeed + (Math.random() * 1.0 - 0.5), // Slightly less upward velocity randomness
                     rotation: Math.random() * Math.PI * 2,
                     rotationSpeed: (Math.random() - 0.5) * 0.25,
-                    life: 60 + Math.random() * 50, 
-                    maxLife: 110, 
+                    life: 60 + Math.random() * 50, // Lifespan in frames
+                    maxLife: 110, // For alpha calculation
                     color: buttonColors[Math.floor(Math.random() * buttonColors.length)],
                     shapePoints: generateJaggedFragmentShape(fragmentBaseSize * (0.4 + Math.random() * 0.6))
                 });
@@ -1946,8 +1981,8 @@
             buttonFragments = buttonFragments.filter(f => {
                 f.x += f.vx;
                 f.y += f.vy;
-                f.vy += 0.12; 
-                f.vx *= 0.985; 
+                f.vy += 0.12; // Gravity effect
+                f.vx *= 0.985; // Air resistance
                 f.rotation += f.rotationSpeed;
                 f.life--;
                 return f.life > 0;
@@ -1958,7 +1993,7 @@
                 ctx.save();
                 ctx.translate(f.x, f.y);
                 ctx.rotate(f.rotation);
-                ctx.globalAlpha = Math.max(0, f.life / (f.maxLife * 0.7)); 
+                ctx.globalAlpha = Math.max(0, f.life / (f.maxLife * 0.7)); // Fade out
 
                 ctx.beginPath();
                 f.shapePoints.forEach((p, index) => {
@@ -1975,7 +2010,7 @@
                 
                 ctx.restore();
             });
-            ctx.globalAlpha = 1.0;
+            ctx.globalAlpha = 1.0; // Reset global alpha
         }
 
 
@@ -1984,37 +2019,40 @@
             const buttonRect = startGameBtn.getBoundingClientRect();
             const gameContainerRect = gameContainer.getBoundingClientRect();
 
+            // Calculate button center relative to the canvas
             const buttonCenterX = buttonRect.left - gameContainerRect.left + buttonRect.width / 2;
             const buttonCenterY = buttonRect.top - gameContainerRect.top + buttonRect.height / 2;
 
+            // Create the "hitter" asteroid
             hitterAsteroid = {
-                x: Math.random() * W * 0.6 + W * 0.2, 
-                y: -60, 
-                size: 50 + Math.random() * 20, 
-                speed: 7 + Math.random() * 3, 
-                angle: 0, 
+                x: Math.random() * W * 0.6 + W * 0.2, // Spawn somewhere in the middle-top
+                y: -60, // Start above screen
+                size: 50 + Math.random() * 20, // Decent size
+                speed: 7 + Math.random() * 3, // Fast
+                angle: 0, // To be calculated
                 rotation: 0,
                 rotationSpeed: (Math.random() - 0.5) * 0.1,
-                shapePoints: [], 
-                color: 'rgb(255, 100, 50)', 
-                isMenu: true
+                shapePoints: [], // To be generated
+                color: 'rgb(255, 100, 50)', // Fiery color
+                isMenu: true // Treat as a menu asteroid for drawing style initially
             };
             hitterAsteroid.shapePoints = generateAsteroidShapePoints(hitterAsteroid.size);
-            hitterAsteroid.angle = Math.atan2(buttonCenterY - hitterAsteroid.y, buttonCenterX - hitterAsteroid.x);
+            hitterAsteroid.angle = Math.atan2(buttonCenterY - hitterAsteroid.y, buttonCenterX - hitterAsteroid.x); // Aim at button
             
             if (menuAnimationFrameId) {
                 cancelAnimationFrame(menuAnimationFrameId);
                 menuAnimationFrameId = null;
             }
-            buttonFragments = []; 
+            buttonFragments = []; // Clear any old fragments
             buttonHitSequenceLoop(buttonCenterX, buttonCenterY);
         }
 
         function buttonHitSequenceLoop(targetX, targetY) {
             ctx.clearRect(0, 0, W, H);
             
-            if (!hitterAsteroid) {
-                updateMenuAsteroids();
+            // Draw regular menu asteroids (excluding the hitter if it was part of it)
+            if (!hitterAsteroid) { // If hitter is gone, menu asteroids might still be there
+                updateMenuAsteroids(); // Continue updating others if hitter is gone but particles exist
             }
             drawAsteroids(menuAsteroids.filter(a => a !== hitterAsteroid)); 
 
@@ -2022,29 +2060,31 @@
                 hitterAsteroid.x += Math.cos(hitterAsteroid.angle) * hitterAsteroid.speed;
                 hitterAsteroid.y += Math.sin(hitterAsteroid.angle) * hitterAsteroid.speed;
                 hitterAsteroid.rotation += hitterAsteroid.rotationSpeed;
-                drawAsteroids([hitterAsteroid]); 
+                drawAsteroids([hitterAsteroid]); // Draw the hitter asteroid
 
+                // Check for collision with the button's center
                 if (distSq(hitterAsteroid.x, hitterAsteroid.y, targetX, targetY) < (hitterAsteroid.size * hitterAsteroid.size * 0.8)) { 
                     playExplosionSound();
-                    createExplosion(hitterAsteroid.x, hitterAsteroid.y, 30, hitterAsteroid.size * 1.2);
+                    createExplosion(hitterAsteroid.x, hitterAsteroid.y, 30, hitterAsteroid.size * 1.2); // Big explosion
                     
-                    startGameBtn.style.visibility = 'hidden'; 
-                    createButtonFragments(targetX, targetY); 
+                    startGameBtn.style.visibility = 'hidden'; // Make button invisible
+                    createButtonFragments(targetX, targetY); // Create button fragments
 
-                    hitterAsteroid = null; 
+                    hitterAsteroid = null; // Hitter asteroid is gone
                 }
             }
             
-            updateParticles(); 
+            updateParticles(); // Update any explosion particles
             drawParticles();
 
-            updateButtonFragments();
+            updateButtonFragments(); // Update button fragments
             drawButtonFragments();
 
+            // Continue animation if hitter, particles, or fragments exist
             if (hitterAsteroid || (gameState.particles && gameState.particles.length > 0) || buttonFragments.length > 0) {
                  buttonHitAnimationId = requestAnimationFrame(() => buttonHitSequenceLoop(targetX, targetY));
             } else {
-                 onButtonAnimationEnd();
+                 onButtonAnimationEnd(); // All animated elements are gone
             }
         }
         
@@ -2052,21 +2092,23 @@
             if (buttonHitAnimationId) cancelAnimationFrame(buttonHitAnimationId);
             buttonHitAnimationId = null;
             
-            startScreen.classList.add('hidden');
+            startScreen.classList.add('hidden'); // Hide start screen UI
             
+            // Reset button for potential future use (though usually game starts)
             startGameBtn.disabled = false;
             startGameBtn.style.visibility = 'visible';
             startGameBtn.style.transform = '';
             startGameBtn.style.opacity = '';
 
-            menuAsteroids = []; 
+            menuAsteroids = []; // Clear menu asteroids
             buttonFragments = []; 
-            if(gameState.particles) gameState.particles = []; 
+            if(gameState.particles) gameState.particles = []; // Clear any remaining particles
 
-            resetGameState();
+            resetGameState(); // Prepare for new game
 
-            gameState.player.y = H + gameState.player.size * 2;
-            const targetPlayerY = gameState.playerStartY;
+            // Player emerge animation setup
+            gameState.player.y = H + gameState.player.size * 2; // Start below screen
+            const targetPlayerY = gameState.playerStartY; // Defined in resetGameState
 
             playerEmergeSequenceLoop(targetPlayerY);
         }
@@ -2074,17 +2116,18 @@
         function playerEmergeSequenceLoop(targetY) {
             ctx.clearRect(0, 0, W, H);
             
-            gameState.player.y -= 4;
+            gameState.player.y -= 4; // Move player up
             if (gameState.player.y < targetY) {
-                gameState.player.y = targetY;
+                gameState.player.y = targetY; // Snap to final position
             }
             
+            // Thruster effect during emergence
             gameState.player.thrusterSize = gameState.player.size * (0.8 + Math.sin(Date.now()/50) * 0.2);
-            gameState.player.lastMoveDir = {x:0, y:-1};
+            gameState.player.lastMoveDir = {x:0, y:-1}; // Thruster points down
 
             drawPlayer();
             
-            updateParticles(); 
+            updateParticles(); // In case any stray particles exist or new effects are added
             drawParticles();
 
             if (gameState.player.y > targetY || (gameState.particles && gameState.particles.length > 0)) {
@@ -2092,8 +2135,9 @@
             } else {
                 if (playerEmergeAnimationId) cancelAnimationFrame(playerEmergeAnimationId);
                 playerEmergeAnimationId = null;
-                isStartingGameAnimation = false;
+                isStartingGameAnimation = false; // End of start-game specific animations
                 
+                // Start the actual game
                 gameState.running = true;
                 gameState.paused = false;
                 pauseTextEl.classList.add('hidden');
@@ -2105,18 +2149,20 @@
         }
 
         function startGame(isQuickStart = false) {
-            initAudio(); 
+            initAudio(); // Ensure audio context is ready
 
+            // Cancel any ongoing animations
             if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
             if (menuAnimationFrameId) { cancelAnimationFrame(menuAnimationFrameId); menuAnimationFrameId = null; }
             if (buttonHitAnimationId) { cancelAnimationFrame(buttonHitAnimationId); buttonHitAnimationId = null; }
             if (playerEmergeAnimationId) { cancelAnimationFrame(playerEmergeAnimationId); playerEmergeAnimationId = null; }
             
-            isStartingGameAnimation = false;
+            isStartingGameAnimation = false; // Reset animation flag
             hitterAsteroid = null;
             buttonFragments = [];
-            if (gameState.particles) gameState.particles = [];
+            if (gameState.particles) gameState.particles = []; // Clear particles
 
+            // Reset start button appearance
             startGameBtn.style.visibility = 'visible';
             startGameBtn.style.transform = '';
             startGameBtn.style.opacity = '';
@@ -2125,9 +2171,9 @@
 
             startScreen.classList.add('hidden');
             gameOverScreen.classList.add('hidden');
-            menuAsteroids = []; 
+            menuAsteroids = []; // Clear any menu asteroids
 
-            if (isQuickStart) {
+            if (isQuickStart) { // For restarts
                 resetGameState();
                 gameState.running = true;
                 gameState.paused = false;
@@ -2136,14 +2182,14 @@
                 gameState.lastTime = performance.now();
                 if (musicEnabled && audioContext) startBackgroundMusic();
                 animationFrameId = requestAnimationFrame(gameLoop);
-            } else {
+            } else { // For initial start from menu
                 isStartingGameAnimation = true;
                 
-                startScreen.classList.remove('hidden'); 
-                ctx.clearRect(0, 0, W, H);
+                startScreen.classList.remove('hidden'); // Ensure start screen is visible for button animation
+                ctx.clearRect(0, 0, W, H); // Clear canvas
 
-                menuAnimationLoop(); 
-                prepareButtonHitAnimation(); 
+                menuAnimationLoop(); // Restart menu asteroid animation if it was stopped
+                prepareButtonHitAnimation(); // Start the button hit sequence
             }
         }
         
@@ -2152,10 +2198,10 @@
 
 
         function endGame(reason = 'player_defeated') {
-            if (!gameState.running) return; 
+            if (!gameState.running) return; // Prevent multiple calls
             gameState.running = false;
             stopBackgroundMusic();
-            if (sfxEnabled && audioContext && (!gameState.bossData || gameState.bossData.health > 0)) {
+            if (sfxEnabled && audioContext && (!gameState.bossData || gameState.bossData.health > 0)) { // Don't play explosion if boss already defeated
                 playExplosionSound(); 
             }
 
@@ -2179,10 +2225,10 @@
                     break;
             }
             
-            updateHighScoreDisplay(); 
+            updateHighScoreDisplay(); // Ensure game over screen shows latest high score
             
             gameOverScreen.classList.remove('hidden');
-            if (pauseBtn) pauseBtn.textContent = '||'; // Reset pause button
+            if (pauseBtn) pauseBtn.textContent = '||'; // Reset pause button text
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
@@ -2195,31 +2241,32 @@
                  return;
             }
             if (gameState.paused) {
+                // For pause, animationFrameId is managed by togglePause()
                 return; 
             }
 
-            const now = Date.now();
+            const now = Date.now(); // Using Date.now() for consistency with ability timers
 
 
             updatePlayer(now);
             updateBullets();
             updateAsteroids(now);
             if (gameState.bossActive) updateBoss(now); 
-            if (!gameState.running) return;
+            if (!gameState.running) return; // Boss update might end game
 
             updateAbilityCapsules();
             updateActiveAbility(now);
             updateMultiplier(); 
             updateLevel(); 
             checkCollisions(now); 
-            if (!gameState.running) return;
+            if (!gameState.running) return; // Collisions might end game
 
             updateParticles();
             updateScreenShake();
             
             ctx.clearRect(0, 0, W, H);
             ctx.save();
-            ctx.translate(gameState.camera.x, gameState.camera.y);
+            ctx.translate(gameState.camera.x, gameState.camera.y); // Apply screen shake
 
             drawPlayer();
             drawBullets();
@@ -2231,7 +2278,7 @@
             ctx.restore(); 
             updateUI(now);
             
-            gameState.lastTime = now;
+            gameState.lastTime = now; // For delta time calculations if needed, or boss timer
             animationFrameId = requestAnimationFrame(gameLoop);
         }
 
@@ -2245,25 +2292,26 @@
                 const playerTopExtent = gameState.player.size;
                 const playerBottomExtent = gameState.player.size * 0.6;
 
-                if(!gameState.running){
+                if(!gameState.running && gameState.playerStartY !== undefined){ // If game not running, reset to start pos
                     gameState.player.x = W / 2;
-                } else {
+                    gameState.player.y = gameState.playerStartY;
+                } else { // If game running, constrain within new bounds
                     gameState.player.x = Math.max(playerHalfWidth, Math.min(W - playerHalfWidth, gameState.player.x));
                 }
                 
+                // Update playerStartY reference if it exists
                 if (gameState.playerStartY !== undefined) {
                     gameState.playerStartY = H - 80;
-                     if(!gameState.running){
-                         gameState.player.y = gameState.playerStartY;
-                     }
                 }
+                // Constrain Y position
                 gameState.player.y = Math.max(playerTopExtent, Math.min(H - playerBottomExtent, gameState.player.y));
             }
-            if (gameState.bossData) {
+            if (gameState.bossData) { // Adjust boss target if it's outside new bounds
                 if (gameState.bossData.targetX > W - gameState.bossData.size) gameState.bossData.targetX = W - gameState.bossData.size * 1.5;
                 if (gameState.bossData.targetY > H * 0.5) gameState.bossData.targetY = H * 0.4;
             }
             
+            // If on start screen and not in the middle of button animation, restart menu animation
             if (!startScreen.classList.contains('hidden') && !isStartingGameAnimation && !menuAnimationFrameId) {
                  menuAnimationLoop();
             }
@@ -2274,13 +2322,14 @@
             W = canvas.width = window.innerWidth;
             H = canvas.height = window.innerHeight;
             createStars();
-            resetGameState(); 
-            updateUI(Date.now()); 
-            updateHighScoreDisplay();
+            resetGameState(); // Initialize game state object
+            updateUI(Date.now()); // Update UI elements with initial state
+            updateHighScoreDisplay(); // Show high score
             startScreen.classList.remove('hidden');
             gameOverScreen.classList.add('hidden');
-            if (pauseBtn) pauseBtn.textContent = '||';
-            if (!menuAnimationFrameId) {
+            if (pauseBtn) pauseBtn.textContent = '||'; // Initial pause button state
+
+            if (!menuAnimationFrameId) { // Start menu animation loop
                  menuAnimationLoop();
             }
         };
