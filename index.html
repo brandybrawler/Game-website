@@ -1,0 +1,2066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroid Dodge - Ultra Enhanced</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0c0c1d 0%, #1a1a2e 50%, #16213e 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-canvas {
+            width: 100%;
+            height: 100%;
+             background: radial-gradient(circle at 50% 50%, rgba(15, 15, 70, 0.1) 0%, transparent 70%);
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            color: #00ffff;
+        }
+        .high-score {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            color: #ffd700;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+        }
+
+        .health {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 20px;
+            color: #ff4757;
+        }
+
+        .level-display {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            font-size: 18px;
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .multiplier-display {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            font-size: 18px;
+            color: #ff6b6b;
+            text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+        }
+
+        .ability-display {
+            position: absolute;
+            bottom: 60px;
+            left: 20px;
+            font-size: 16px;
+            color: #a0a0ff;
+            text-shadow: 0 0 10px rgba(160, 160, 255, 0.5);
+        }
+        .pause-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 15px white;
+            z-index: 20;
+        }
+
+        .audio-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            pointer-events: auto;
+        }
+
+        .audio-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .audio-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .start-screen, .game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            backdrop-filter: blur(5px);
+            z-index: 15;
+        }
+
+        .title {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3)); }
+            to { filter: drop-shadow(0 0 30px rgba(255, 255, 255, 0.5)); }
+        }
+
+        .subtitle { /* Also used for game over reason */
+            font-size: 18px;
+            margin-bottom: 10px; /* Adjusted margin */
+            opacity: 0.8;
+        }
+        .final-score-text { /* Specific class for "Final Score: X" */
+             font-size: 22px; margin-bottom: 20px; opacity: 1; color: #fff;
+        }
+
+        .start-screen .high-score-display {
+            font-size: 20px;
+            color: #ffd700;
+            margin-bottom: 20px;
+        }
+
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 18px;
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+            pointer-events: auto;
+            z-index: 20;
+            position: relative;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+            background: linear-gradient(45deg, #764ba2 0%, #667eea 100%);
+        }
+
+        .instructions {
+            margin-top: 20px;
+            font-size: 14px;
+            opacity: 0.7;
+            line-height: 1.5;
+        }
+        .instructions .powerup-key {
+            color: #a0a0ff; font-weight: bold;
+        }
+
+
+        .stats {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #ffd700;
+        }
+        .stats div { margin-bottom: 5px; }
+
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top:0; left:0;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            from { opacity: 0.2; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1.2); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .level-up {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            animation: levelUpAnim 2s ease-out forwards;
+            pointer-events: none;
+            z-index: 12;
+        }
+
+        @keyframes levelUpAnim {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -100%) scale(1); }
+        }
+
+        .screen-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 0, 0, 0.5);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 100;
+            animation: flashAnim 0.3s ease-out;
+        }
+        @keyframes flashAnim {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .near-miss-indicator {
+            position: absolute;
+            font-size: 14px;
+            font-weight: bold;
+            color: #39FF14;
+            text-shadow: 0 0 5px #39FF14, 0 0 10px white;
+            opacity: 0;
+            animation: nearMissAnim 1s ease-out forwards;
+            pointer-events: none;
+            z-index: 11;
+        }
+        @keyframes nearMissAnim {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            50% { opacity: 0.8; transform: translateY(-15px) scale(1.1); }
+            100% { opacity: 0; transform: translateY(-30px) scale(0.8); }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="stars" id="starsContainer"></div>
+    <div class="game-container" id="gameContainer">
+        <canvas class="game-canvas"></canvas>
+        
+        <div class="ui-overlay">
+            <div class="score">Score: <span id="score">0</span></div>
+            <div class="high-score">High Score: <span id="highScoreText">0</span></div>
+            <div class="health">Health: <span id="health">3</span></div>
+            <div class="level-display">Level: <span id="level">1</span></div>
+            <div class="multiplier-display">Multiplier: <span id="multiplier">1x</span></div>
+            <div class="ability-display" id="abilityDisplay"></div>
+            <div class="audio-controls">
+                <button class="audio-btn" id="musicToggle">Music: ON</button>
+                <button class="audio-btn" id="sfxToggle">SFX: ON</button>
+            </div>
+            <div class="pause-text hidden" id="pauseText">PAUSED</div>
+        </div>
+
+        <div class="start-screen" id="startScreen">
+            <h1 class="title">ASTEROID DODGE</h1>
+            <p class="subtitle">Navigate the cosmos and survive the asteroid onslaught!</p>
+            <div class="high-score-display">High Score: <span id="startScreenHighScore">0</span></div>
+            <button class="btn" id="startGameBtn">START GAME</button>
+            <div class="instructions">
+                Use ARROW KEYS or WASD to move your ship<br>
+                Press SPACE to shoot lasers<br>
+                Shoot power-up capsules for temporary abilities:<br>
+                <span class="powerup-key">D</span> - Double Laser, <span class="powerup-key">S</span> - Shield, <span class="powerup-key">R</span> - Rapid Fire<br>
+                <span class="powerup-key">T</span> - Time Slow, <span class="powerup-key">G</span> - Ghost Mode<br>
+                Destroy asteroids in succession for score multipliers!<br>
+                During Boss Battles: Keep the boss from reaching the bottom!<br>
+                Press 'P' to Pause/Resume
+            </div>
+        </div>
+
+        <div class="game-over-screen hidden" id="gameOverScreen">
+            <h1 class="title">GAME OVER</h1>
+            <p class="subtitle" id="gameOverReason">You were overwhelmed by asteroids!</p>
+            <p class="final-score-text">Final Score: <span id="finalScore">0</span></p>
+            <div class="stats">
+                <div>Level Reached: <span id="finalLevel">1</span></div>
+                <div>Asteroids Destroyed: <span id="finalAsteroids">0</span></div>
+                <div>Max Multiplier: <span id="finalMultiplier">1x</span></div>
+                <div>Game Over High Score: <span id="gameOverHighScore">0</span></div>
+            </div>
+            <button class="btn" id="restartGameBtn">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.querySelector('.game-canvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('gameContainer');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('highScoreText'); // Renamed for clarity vs. variable highScore
+        const healthEl = document.getElementById('health');
+        const levelEl = document.getElementById('level');
+        const multiplierEl = document.getElementById('multiplier');
+        const abilityDisplayEl = document.getElementById('abilityDisplay');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreEl = document.getElementById('finalScore');
+        const finalLevelEl = document.getElementById('finalLevel');
+        const finalAsteroidsEl = document.getElementById('finalAsteroids');
+        const finalMultiplierEl = document.getElementById('finalMultiplier');
+        const musicToggleBtn = document.getElementById('musicToggle');
+        const sfxToggleBtn = document.getElementById('sfxToggle');
+        const pauseTextEl = document.getElementById('pauseText');
+        const startScreenHighScoreEl = document.getElementById('startScreenHighScore');
+        const gameOverHighScoreEl = document.getElementById('gameOverHighScore');
+        const starsContainer = document.getElementById('starsContainer');
+        const startGameBtn = document.getElementById('startGameBtn');
+        const restartGameBtn = document.getElementById('restartGameBtn');
+        const gameOverReasonEl = document.getElementById('gameOverReason');
+
+        let W, H; // Cached canvas width and height
+
+        let animationFrameId;
+        let menuAnimationFrameId;
+        let buttonHitAnimationId;
+        let playerEmergeAnimationId;
+
+        let audioContext;
+        let musicEnabled = true;
+        let sfxEnabled = true;
+        let backgroundMusic = null;
+
+        const BOSS_DOWNWARD_DRIFT_BASE = 0.025; // Slightly reduced for new AI
+        const BOSS_DOWNWARD_DRIFT_LEVEL_SCALE = 0.004;
+        const NUDGE_PER_HIT = 1.2; 
+        const SHIELD_BOSS_NUDGE_FACTOR = 15; 
+        const DANGER_ZONE_HEIGHT = 30; 
+
+        // Particle Pooling
+        let particlePool = [];
+        const MAX_PARTICLES_IN_POOL = 300;
+
+        function getParticleFromPool() {
+            if (particlePool.length > 0) {
+                return particlePool.pop();
+            }
+            return {}; // Return empty object to be populated
+        }
+
+        function releaseParticleToPool(particle) {
+            if (particlePool.length < MAX_PARTICLES_IN_POOL) {
+                particlePool.push(particle);
+            }
+            // If pool is full, the particle will be garbage collected when it's no longer referenced
+        }
+
+
+        function initAudio() { 
+            if (audioContext) return;
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.warn('Web Audio API not supported');
+                musicEnabled = false;
+                sfxEnabled = false;
+                musicToggleBtn.disabled = true;
+                sfxToggleBtn.disabled = true;
+                musicToggleBtn.textContent = 'Music: N/A';
+                sfxToggleBtn.textContent = 'SFX: N/A';
+            }
+        }
+        function createOscillator(frequency, type = 'sine', duration = 0.1, volume = 0.1) { 
+            if (!sfxEnabled || !audioContext) return;
+            try {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+                oscillator.type = type;
+                gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + duration);
+            } catch (e) { console.warn('Audio error:', e); }
+        }
+        function playShootSound() { createOscillator(800, 'square', 0.05, 0.03); }
+        function playExplosionSound() { createOscillator(150, 'sawtooth', 0.3, 0.1); }
+        function playPowerUpSound() {
+            createOscillator(400, 'sine', 0.2, 0.08);
+            setTimeout(() => createOscillator(600, 'sine', 0.2, 0.08), 100);
+            setTimeout(() => createOscillator(800, 'sine', 0.2, 0.08), 200);
+        }
+        function playLevelUpSound() { 
+            createOscillator(300, 'sine', 0.3, 0.15);
+            setTimeout(() => createOscillator(450, 'sine', 0.3, 0.15), 150);
+            setTimeout(() => createOscillator(600, 'sine', 0.3, 0.15), 300);
+        }
+        function playHitSound() { createOscillator(100, 'sawtooth', 0.5, 0.15); }
+        function playNearMissSound() { createOscillator(1200, 'sine', 0.1, 0.05); }
+        function playBossHitSound() { createOscillator(80, 'square', 0.2, 0.2); }
+        function playBossDefeatSound() {
+            createOscillator(200, 'sawtooth', 0.5, 0.25);
+            setTimeout(() => createOscillator(150, 'sawtooth', 0.5, 0.2), 200);
+            setTimeout(() => createOscillator(100, 'sawtooth', 0.8, 0.15), 400);
+        }
+
+
+        function startBackgroundMusic() { 
+            if (!musicEnabled || backgroundMusic || !audioContext) return;
+            backgroundMusic = setInterval(() => {
+                if (gameState.running && !gameState.paused && musicEnabled && audioContext) {
+                    const notes = [110, 130.81, 146.83, 164.81, 196.00, 220.00];
+                    const note = notes[Math.floor(Math.random() * notes.length)];
+                    createOscillator(note, 'triangle', 0.8, 0.02); 
+                }
+            }, 3000 + Math.random() * 2000);
+        }
+        function stopBackgroundMusic() { 
+            if (backgroundMusic) { clearInterval(backgroundMusic); backgroundMusic = null; }
+        }
+        musicToggleBtn.addEventListener('click', () => { 
+            initAudio(); if (!audioContext) return;
+            musicEnabled = !musicEnabled;
+            musicToggleBtn.textContent = `Music: ${musicEnabled ? 'ON' : 'OFF'}`;
+            if (musicEnabled && gameState.running && !gameState.paused) startBackgroundMusic(); else stopBackgroundMusic();
+        });
+        sfxToggleBtn.addEventListener('click', () => { 
+            initAudio(); if (!audioContext) return;
+            sfxEnabled = !sfxEnabled;
+            sfxToggleBtn.textContent = `SFX: ${sfxEnabled ? 'ON' : 'OFF'}`;
+        });
+
+        const ABILITY_TYPES = ['doubleLaser', 'shield', 'rapidFire', 'timeSlow', 'ghost'];
+        const ABILITY_SYMBOLS = { doubleLaser: 'D', shield: 'S', rapidFire: 'R', timeSlow: 'T', ghost: 'G' };
+        const ABILITY_COLORS = { doubleLaser: '#33FF99', shield: '#66CCFF', rapidFire: '#FFD700', timeSlow: '#ADD8E6', ghost: '#E6E6FA' };
+        const ABILITY_EXPLOSION_HUES = { doubleLaser: 300, shield: 200, rapidFire: 50, timeSlow: 180, ghost: 270 };
+
+
+        let gameState = {};
+        let highScore = localStorage.getItem('asteroidDodgeHighScore') ? parseInt(localStorage.getItem('asteroidDodgeHighScore')) : 0;
+        let menuAsteroids = [];
+        const MAX_MENU_ASTEROIDS = 15;
+        const MENU_ASTEROID_SPAWN_CHANCE = 0.025;
+        let isStartingGameAnimation = false;
+        let hitterAsteroid = null;
+        let buttonFragments = [];
+
+
+        function resetGameState() {
+            const playerStartY = H - 80;
+            gameState = {
+                running: false,
+                paused: false, 
+                score: 0,
+                health: 3,
+                level: 1,
+                multiplier: 1,
+                maxMultiplier: 1,
+                asteroidsDestroyed: 0,
+                consecutiveHits: 0,
+                timeSinceLastHit: 0,
+                player: { 
+                    x: W / 2, y: playerStartY, 
+                    size: 15, speed: 5, 
+                    isGhost: false, 
+                    thrusterSize: 0, 
+                    lastMoveDir: {x:0, y:0} 
+                },
+                playerStartY: playerStartY,
+                asteroids: [],
+                bullets: [],
+                particles: [],
+                abilityCapsules: [],
+                activeAbility: null,
+                abilityDurations: { doubleLaser: 7000, shield: 10000, rapidFire: 7000, timeSlow: 8000, ghost: 6000 },
+                defaultShootCooldown: 200, 
+                rapidFireCooldownValue: 80,
+                shootCooldown: 200,
+                keys: {},
+                lastTime: 0,
+                lastShot: 0,
+                shieldPulseTime: 0,
+                screenShake: 0,
+                camera: { x: 0, y: 0 },
+                isTimeSlowActive: false, 
+                bossActive: false, 
+                bossData: null,
+                nearMissCooldowns: new Map() 
+            };
+            updateHighScoreDisplay();
+        }
+        
+        function updateHighScoreDisplay() {
+            highScoreEl.textContent = highScore;
+            startScreenHighScoreEl.textContent = highScore;
+            gameOverHighScoreEl.textContent = highScore;
+        }
+
+        function checkAndSetHighScore() {
+            if (gameState.score > highScore) {
+                highScore = gameState.score;
+                localStorage.setItem('asteroidDodgeHighScore', highScore);
+                updateHighScoreDisplay(); 
+            }
+        }
+
+        function createStars() { 
+            starsContainer.innerHTML = ''; 
+            const numStars = Math.floor((W * H) / 8000);
+            for (let i = 0; i < numStars; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's'; 
+                const size = Math.random() * 2.5 + 0.5; 
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        function spawnMenuAsteroid() {
+            const size = Math.random() * 40 + 20;
+            let x, y, angle;
+
+            if (Math.random() < 0.5) {
+                x = Math.random() * W;
+                y = Math.random() < 0.5 ? -size : H + size;
+                angle = Math.random() * Math.PI * 0.6 + Math.PI * 0.2; 
+                if (y > H / 2) angle += Math.PI; 
+            } else { 
+                y = Math.random() * H;
+                x = Math.random() < 0.5 ? -size : W + size;
+                angle = Math.random() * Math.PI * 0.6 - Math.PI * 0.3; 
+                if (x > W / 2) angle += Math.PI; 
+            }
+            
+            const speed = Math.random() * 0.5 + 0.2;
+            const colorShade = 60 + Math.floor(Math.random() * 60);
+            menuAsteroids.push({
+                x, y, size, speed, angle,
+                rotation: 0, rotationSpeed: (Math.random() - 0.5) * 0.01,
+                shapePoints: generateAsteroidShapePoints(size),
+                color: `rgb(${colorShade},${colorShade},${colorShade + Math.floor(Math.random()*15)})`,
+                isMenu: true
+            });
+        }
+
+        function updateMenuAsteroids() {
+            menuAsteroids = menuAsteroids.filter(asteroid => {
+                asteroid.x += Math.cos(asteroid.angle) * asteroid.speed;
+                asteroid.y += Math.sin(asteroid.angle) * asteroid.speed;
+                asteroid.rotation += asteroid.rotationSpeed;
+                const margin = asteroid.size * 2;
+                return asteroid.x > -margin && asteroid.x < W + margin &&
+                       asteroid.y > -margin && asteroid.y < H + margin;
+            });
+            if (Math.random() < MENU_ASTEROID_SPAWN_CHANCE && menuAsteroids.length < MAX_MENU_ASTEROIDS && !hitterAsteroid) { 
+                spawnMenuAsteroid();
+            }
+        }
+        
+        function menuAnimationLoop() {
+            if (startScreen.classList.contains('hidden') && !isStartingGameAnimation) {
+                cancelAnimationFrame(menuAnimationFrameId);
+                menuAnimationFrameId = null;
+                return;
+            }
+            ctx.clearRect(0, 0, W, H);
+            updateMenuAsteroids();
+            drawAsteroids(menuAsteroids); 
+            menuAnimationFrameId = requestAnimationFrame(menuAnimationLoop);
+        }
+
+        document.addEventListener('keydown', (e) => { 
+            gameState.keys[e.code] = true;
+            if (e.code === 'Space' && gameState.running && !gameState.paused) e.preventDefault();
+            if (e.code === 'KeyP' && gameState.running) {
+                togglePause();
+            }
+        });
+        document.addEventListener('keyup', (e) => { gameState.keys[e.code] = false; });
+
+        function togglePause() {
+            gameState.paused = !gameState.paused;
+            pauseTextEl.classList.toggle('hidden', !gameState.paused);
+            if (gameState.paused) {
+                stopBackgroundMusic();
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            } else {
+                if (musicEnabled) startBackgroundMusic();
+                gameState.lastTime = performance.now(); 
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function updatePlayer(currentTime) {
+            const { player, keys } = gameState;
+
+            let movedX = 0;
+            let movedY = 0;
+            let deltaX = 0;
+            let deltaY = 0;
+
+            if (keys['ArrowLeft'] || keys['KeyA']) { deltaX -= player.speed; movedX = -1; }
+            if (keys['ArrowRight'] || keys['KeyD']) { deltaX += player.speed; movedX = (deltaX === 0 && movedX === -1) ? 0 : 1; }
+            if (keys['ArrowUp'] || keys['KeyW']) { deltaY -= player.speed; movedY = -1; }
+            if (keys['ArrowDown'] || keys['KeyS']) { deltaY += player.speed; movedY = (deltaY === 0 && movedY === -1) ? 0 : 1; }
+            
+            if (deltaX !== 0 && deltaY !== 0) {
+                const factor = 1 / Math.sqrt(2);
+                deltaX *= factor;
+                deltaY *= factor;
+            }
+
+            let targetX = player.x + deltaX;
+            let targetY = player.y + deltaY;
+            
+            const playerHalfWidth = player.size * 0.8;
+            const playerTopExtent = player.size; 
+            const playerBottomExtent = player.size * 0.6;
+
+            player.x = Math.max(playerHalfWidth, Math.min(W - playerHalfWidth, targetX));
+            player.y = Math.max(playerTopExtent, Math.min(H - playerBottomExtent, targetY));
+            
+            if (deltaX === 0) movedX = 0;
+            if (deltaY === 0) movedY = 0;
+            player.lastMoveDir = {x: movedX, y: movedY};
+
+            if (keys['Space'] && currentTime - gameState.lastShot > gameState.shootCooldown) {
+                shoot();
+                gameState.lastShot = currentTime;
+            }
+
+            if (movedY < 0 || (movedX !==0 && movedY ===0) || Math.random() < 0.2) { 
+                player.thrusterSize = player.size * (0.6 + Math.random() * 0.5);
+            } else {
+                player.thrusterSize = 0;
+            }
+        }
+
+        function shoot() { 
+            const { player, activeAbility } = gameState;
+            const bulletBaseProps = {
+                y: player.y - player.size,
+                speed: 10, 
+                size: activeAbility && activeAbility.type === 'doubleLaser' ? 4 : 3 
+            };
+            if (gameState.isTimeSlowActive) { 
+                bulletBaseProps.speed *= 1.5;
+            }
+
+            playShootSound();
+            if (activeAbility && activeAbility.type === 'doubleLaser' && Date.now() < activeAbility.endTime) { // Date.now() here is fine for immediate check
+                gameState.bullets.push({ ...bulletBaseProps, x: player.x - 7 });
+                gameState.bullets.push({ ...bulletBaseProps, x: player.x + 7 });
+            } else {
+                gameState.bullets.push({ ...bulletBaseProps, x: player.x });
+            }
+        }
+
+        function updateBullets() { 
+            gameState.bullets = gameState.bullets.filter(bullet => {
+                bullet.y -= bullet.speed;
+                return bullet.y > -bullet.size * 2; 
+            });
+        }
+
+        function spawnAsteroid() {
+            if (gameState.bossActive) return; 
+
+            const edge = Math.floor(Math.random() * 4); 
+            const size = Math.random() * 35 + (15 + gameState.level * 0.5); 
+            let x, y;
+
+            switch(edge) {
+                case 0: x = Math.random() * W; y = -size; break;
+                case 1: x = W + size; y = Math.random() * H; break;
+                case 2: x = Math.random() * W; y = H + size; break;
+                case 3: x = -size; y = Math.random() * H; break;
+            }
+            
+            let angleToCenter = Math.atan2((H/2 + (Math.random()-0.5)*H*0.3) - y, (W/2 + (Math.random()-0.5)*W*0.3) - x); 
+            angleToCenter += (Math.random() - 0.5) * (Math.PI / 4); 
+
+            let baseSpeed = Math.random() * 2 + 1 + (gameState.level * 0.2);
+            
+            const colorShade = 80 + Math.floor(Math.random() * 40); 
+            const asteroidColor = `rgb(${colorShade},${colorShade},${colorShade + Math.floor(Math.random()*10)})`; 
+
+            const newAsteroid = {
+                id: Date.now() + Math.random(), // Date.now() for unique ID is fine
+                x: x, y: y,
+                size: size,
+                speed: gameState.isTimeSlowActive ? baseSpeed * 0.3 : baseSpeed,
+                originalSpeed: baseSpeed, 
+                angle: angleToCenter,
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.05, 
+                health: size > 40 ? (size > 60 ? 3 : 2) : 1, 
+                damageLevel: 0, 
+                shapePoints: generateAsteroidShapePoints(size),
+                color: asteroidColor,
+                isBossComponent: false
+            };
+            gameState.asteroids.push(newAsteroid);
+        }
+        
+        function generateAsteroidShapePoints(size) { 
+            const points = [];
+            const numVertices = Math.floor(Math.random() * 5) + 6; 
+            for (let i = 0; i < numVertices; i++) {
+                const angle = (i / numVertices) * Math.PI * 2;
+                const radius = size * (0.6 + Math.random() * 0.7); 
+                points.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+            }
+            return points;
+        }
+
+        function updateAsteroids(currentTime) {
+            gameState.asteroids = gameState.asteroids.filter(asteroid => {
+                if (!gameState.bossData || asteroid.id !== gameState.bossData.id) {
+                    asteroid.x += Math.cos(asteroid.angle) * asteroid.speed;
+                    asteroid.y += Math.sin(asteroid.angle) * asteroid.speed;
+                }
+                asteroid.rotation += asteroid.rotationSpeed;
+                
+                const margin = asteroid.size * 2;
+                return asteroid.x > -margin && asteroid.x < W + margin &&
+                       asteroid.y > -margin && asteroid.y < H + margin;
+            });
+            
+            const maxAsteroids = gameState.bossActive ? 2 : (5 + gameState.level * 1.5); 
+            let spawnChance = gameState.isTimeSlowActive ? 0.003 : (0.015 + gameState.level * 0.002);
+            if (gameState.bossActive) spawnChance = 0.005; 
+
+            if (Math.random() < spawnChance && gameState.asteroids.length < maxAsteroids) {
+                if (gameState.bossActive && gameState.bossData) {
+                    spawnBossMinion();
+                } else {
+                    spawnAsteroid();
+                }
+            }
+            checkNearMisses(currentTime); 
+        }
+        
+        // Helper function for boss angle normalization
+        function normalizeAngle(angle) {
+            while (angle > Math.PI) angle -= 2 * Math.PI;
+            while (angle < -Math.PI) angle += 2 * Math.PI;
+            return angle;
+        }
+
+        function spawnBossAsteroid() {
+            gameState.bossActive = true;
+            const size = 100 + gameState.level * 8; 
+            const baseAISpeed = 0.5 + gameState.level * 0.05; // Slightly increased base AI speed
+            const baseDriftSpeed = BOSS_DOWNWARD_DRIFT_BASE + gameState.level * BOSS_DOWNWARD_DRIFT_LEVEL_SCALE;
+
+            gameState.bossData = {
+                id: 'boss_' + Date.now(), // Date.now() for unique ID is fine
+                x: W / 2,
+                y: -size, 
+                size: size,
+                speed: gameState.isTimeSlowActive ? baseAISpeed * 0.3 : baseAISpeed, 
+                originalSpeed: baseAISpeed,
+                downwardDriftSpeed: gameState.isTimeSlowActive ? baseDriftSpeed * 0.3 : baseDriftSpeed,
+                originalDownwardDriftSpeed: baseDriftSpeed,
+                angle: Math.PI / 2, 
+                rotation: 0,
+                rotationSpeed: 0.005,
+                health: 25 + gameState.level * 12, 
+                maxHealth: 25 + gameState.level * 12,
+                damageLevel: 0,
+                shapePoints: generateAsteroidShapePoints(size), 
+                color: '#503030', 
+                lastActionTime: 0, // Used for specific actions like minion spawn cooldown
+                actionCooldown: 2000, // General cooldown for certain actions if needed
+                isBossComponent: true,
+                // New AI state properties
+                behavior: 'ENTERING', 
+                behaviorTimer: 2500, // Time to enter and position
+                targetX: W / 2,
+                targetY: H * 0.2, 
+                chargeTargetX: 0,
+                chargeTargetY: 0
+            };
+            gameState.asteroids.push(gameState.bossData); 
+            playLevelUpSound(); 
+            gameState.asteroids = gameState.asteroids.filter(a => a.id === gameState.bossData.id || Math.random() < 0.1); 
+        }
+
+        function updateBoss(currentTime) {
+            if (!gameState.bossActive || !gameState.bossData) return;
+            const boss = gameState.bossData;
+            
+            // Approximate delta time in ms for timer (assuming ~60fps)
+            // For more accuracy, pass actual deltaTime from gameLoop
+            const deltaTimeMs = gameState.lastTime ? (currentTime - gameState.lastTime) : (1000/60);
+            boss.behaviorTimer -= deltaTimeMs;
+
+            // State Machine
+            if (boss.behaviorTimer <= 0) {
+                switch(boss.behavior) {
+                    case 'ENTERING':
+                        boss.behavior = 'SWEEPING';
+                        boss.targetX = Math.random() * (W - boss.size * 2) + boss.size;
+                        boss.targetY = H * (0.15 + Math.random() * 0.2); // Upper sweep area
+                        boss.behaviorTimer = 4000 + Math.random() * 3000;
+                        break;
+                    case 'SWEEPING':
+                        if (Math.random() < 0.6) { 
+                            boss.behavior = 'AIMING';
+                            boss.behaviorTimer = 1000 + Math.random() * 500; 
+                        } else { 
+                            boss.targetX = Math.random() * (W - boss.size * 2) + boss.size;
+                            boss.targetY = H * (0.15 + Math.random() * 0.2);
+                            boss.behaviorTimer = 3000 + Math.random() * 2000;
+                            if (Math.random() < 0.35 && currentTime - boss.lastActionTime > boss.actionCooldown) {
+                                for(let i=0; i < 1 + Math.floor(gameState.level/5); i++) spawnBossMinion();
+                                boss.lastActionTime = currentTime; 
+                            }
+                        }
+                        break;
+                    case 'AIMING':
+                        boss.behavior = 'CHARGING';
+                        boss.chargeTargetX = gameState.player.x;
+                        boss.chargeTargetY = Math.min(gameState.player.y + boss.size * 0.5, H - DANGER_ZONE_HEIGHT - boss.size * 0.7);
+                        boss.behaviorTimer = 1600 + Math.random() * 600; 
+                        // Could add a visual/audio telegraph for the charge here
+                        break;
+                    case 'CHARGING':
+                        boss.behavior = 'SWEEPING'; 
+                        boss.targetX = Math.random() * (W - boss.size * 2) + boss.size;
+                        boss.targetY = H * (0.1 + Math.random() * 0.15); // Reposition higher after charge
+                        boss.behaviorTimer = 3000 + Math.random() * 2000;
+                        break;
+                }
+            }
+
+            // Movement Logic based on state
+            let desiredAngle = boss.angle;
+            let currentSpeed = gameState.isTimeSlowActive ? boss.originalSpeed * 0.3 : boss.originalSpeed;
+            let currentDrift = gameState.isTimeSlowActive ? boss.originalDownwardDriftSpeed * 0.3 : boss.originalDownwardDriftSpeed;
+
+            const turnRate = 0.035; // Radians per frame (approx)
+
+            switch(boss.behavior) {
+                case 'ENTERING':
+                    desiredAngle = Math.atan2(boss.targetY - boss.y, boss.targetX - boss.x);
+                    if (Math.hypot(boss.targetX - boss.x, boss.targetY - boss.y) < boss.size * 0.3) {
+                        currentSpeed *= 0.5;
+                        if (boss.behaviorTimer > 50) boss.behaviorTimer = 50; // Force faster transition if arrived
+                    }
+                    break;
+                case 'SWEEPING':
+                    desiredAngle = Math.atan2(boss.targetY - boss.y, boss.targetX - boss.x);
+                    if (Math.hypot(boss.targetX - boss.x, boss.targetY - boss.y) < boss.size * 0.5) {
+                        currentSpeed *= 0.7;
+                    }
+                    break;
+                case 'AIMING':
+                    desiredAngle = Math.atan2(gameState.player.y - boss.y, gameState.player.x - boss.x);
+                    currentSpeed *= 0.15; 
+                    currentDrift *= 0.05; 
+                    break;
+                case 'CHARGING':
+                    desiredAngle = Math.atan2(boss.chargeTargetY - boss.y, boss.chargeTargetX - boss.x);
+                    currentSpeed *= 2.5; 
+                    if (Math.hypot(boss.chargeTargetX - boss.x, boss.chargeTargetY - boss.y) < boss.size * 0.6) {
+                        if (boss.behaviorTimer > 50) boss.behaviorTimer = 50; 
+                    }
+                    break;
+            }
+
+            const angleDiff = normalizeAngle(desiredAngle - boss.angle);
+            boss.angle = normalizeAngle(boss.angle + Math.max(-turnRate, Math.min(turnRate, angleDiff)));
+
+            boss.x += Math.cos(boss.angle) * currentSpeed;
+            boss.y += Math.sin(boss.angle) * currentSpeed;
+            boss.y += currentDrift;
+
+            // Boundary checks
+            boss.x = Math.max(boss.size * 0.7, Math.min(W - boss.size * 0.7, boss.x));
+            if ((boss.x <= boss.size * 0.7 || boss.x >= W - boss.size * 0.7)) {
+                if (boss.behavior === 'SWEEPING' || boss.behavior === 'ENTERING') {
+                     boss.targetX = (boss.x <= W / 2) ? (W - boss.size * 1.5) : (boss.size * 1.5); // Bounce to other side
+                } else if (boss.behavior === 'CHARGING') { // Don't get stuck on wall during charge
+                    boss.angle = Math.PI - boss.angle; // Reflect angle
+                }
+            }
+
+            const minY = boss.size * 0.25;
+            const maxYOperational = H * 0.55; 
+
+            if (boss.y < minY) {
+                boss.y = minY;
+                if (boss.behavior !== 'CHARGING' && Math.sin(boss.angle) < 0) boss.angle = normalizeAngle(-boss.angle); 
+            }
+            if (boss.behavior !== 'CHARGING' && boss.y > maxYOperational) {
+                boss.y = maxYOperational;
+                 if (Math.sin(boss.angle) > 0) boss.angle = normalizeAngle(-boss.angle);
+            }
+
+            if (boss.y + boss.size * 0.7 > H) { 
+                endGame('earth_destroyed');
+                return;
+            }
+
+            if (boss.health <= 0) {
+                defeatBoss();
+            }
+        }
+        
+        function spawnBossMinion() {
+            if (!gameState.bossData) return;
+            const boss = gameState.bossData;
+            const size = 20 + Math.random() * 10;
+            const angleFromBoss = Math.random() * Math.PI * 2;
+            const spawnDist = boss.size * 0.7;
+            let baseSpeed = (1.5 + Math.random() + gameState.level * 0.1);
+
+            const minion = {
+                id: 'minion_' + Date.now() + Math.random(), // Date.now() for unique ID is fine
+                x: boss.x + Math.cos(angleFromBoss) * spawnDist,
+                y: boss.y + Math.sin(angleFromBoss) * spawnDist,
+                size: size,
+                speed: gameState.isTimeSlowActive ? baseSpeed * 0.3 : baseSpeed,
+                originalSpeed: baseSpeed, 
+                angle: angleFromBoss + (Math.random() - 0.5) * 0.5, 
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.1,
+                health: 1,
+                damageLevel: 0,
+                shapePoints: generateAsteroidShapePoints(size),
+                color: `rgb(100, ${80 + Math.floor(Math.random() * 30)}, ${80 + Math.floor(Math.random() * 30)})`,
+                isBossComponent: true 
+            };
+            gameState.asteroids.push(minion);
+        }
+
+        function defeatBoss() {
+            playBossDefeatSound();
+            createExplosion(gameState.bossData.x, gameState.bossData.y, 30, gameState.bossData.size * 1.5); 
+            gameState.asteroids = gameState.asteroids.filter(a => a.id !== gameState.bossData.id && !a.isBossComponent); 
+            gameState.bossActive = false;
+            gameState.bossData = null;
+            gameState.score += 750 * gameState.level * gameState.multiplier; 
+            if (gameState.health < 3) gameState.health++;
+            spawnAbilityCapsule(true); 
+            gameState.screenShake = 40;
+        }
+
+        function checkNearMisses(currentTime) {
+            if (!gameState.player) return;
+            const nearMissThreshold = 25; 
+            const scoreBonus = 10;
+            const cooldownDuration = 2000; 
+
+            gameState.asteroids.forEach(asteroid => {
+                if (gameState.nearMissCooldowns.has(asteroid.id) && currentTime < gameState.nearMissCooldowns.get(asteroid.id)) {
+                    return; 
+                }
+                if (gameState.bossData && asteroid.id === gameState.bossData.id) return;
+
+                const dx = gameState.player.x - asteroid.x;
+                const dy = gameState.player.y - asteroid.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const combinedRadii = gameState.player.size + asteroid.size;
+
+                if (distance < combinedRadii + nearMissThreshold && distance > combinedRadii * 0.8) { 
+                    gameState.score += scoreBonus * gameState.multiplier;
+                    playNearMissSound();
+                    showNearMissIndicator(gameState.player.x, gameState.player.y - 30, `+${scoreBonus * gameState.multiplier}`);
+                    gameState.nearMissCooldowns.set(asteroid.id, currentTime + cooldownDuration);
+                }
+            });
+            for (const [id, time] of gameState.nearMissCooldowns.entries()) {
+                if (currentTime > time) {
+                    gameState.nearMissCooldowns.delete(id);
+                }
+            }
+        }
+
+        function showNearMissIndicator(x, y, text) {
+            const indicator = document.createElement('div');
+            indicator.className = 'near-miss-indicator';
+            indicator.textContent = text;
+            const gameRect = gameContainer.getBoundingClientRect();
+            indicator.style.left = (x - gameRect.left) + 'px';
+            indicator.style.top = (y - gameRect.top) + 'px';
+            gameContainer.appendChild(indicator);
+            setTimeout(() => indicator.remove(), 1000);
+        }
+
+
+        function spawnAbilityCapsule(guaranteedGood = false) {
+            const size = 12;
+            let type;
+            if (guaranteedGood) { 
+                const goodTypes = ['shield', 'ghost', 'timeSlow'];
+                type = goodTypes[Math.floor(Math.random() * goodTypes.length)];
+            } else {
+                type = ABILITY_TYPES[Math.floor(Math.random() * ABILITY_TYPES.length)];
+            }
+            
+            gameState.abilityCapsules.push({
+                x: Math.random() * (W - size * 2) + size,
+                y: -size, size: size,
+                speed: Math.random() * 1.5 + 1, 
+                type: type, pulse: 0
+            });
+        }
+
+        function updateAbilityCapsules() { 
+            gameState.abilityCapsules = gameState.abilityCapsules.filter(capsule => {
+                let speed = capsule.speed;
+                if (gameState.isTimeSlowActive) speed *=0.5; 
+                capsule.y += speed;
+                capsule.pulse = (capsule.pulse + 0.05) % (Math.PI * 2);
+                return capsule.y < H + capsule.size;
+            });
+            const spawnChance = (gameState.activeAbility || gameState.abilityCapsules.length >=2) ? 0.0005 : 0.0025; 
+            if (Math.random() < spawnChance && !gameState.bossActive) {
+                 spawnAbilityCapsule();
+            }
+        }
+        
+        function activateAbility(newAbilityType, currentTime) {
+            const newEndTime = currentTime + gameState.abilityDurations[newAbilityType];
+
+            deactivateCurrentAbilityVisualsAndLogicOnly(); 
+
+            const currentActualShootCooldown = gameState.shootCooldown;
+
+            if (newAbilityType === 'rapidFire') {
+                gameState.activeAbility = { type: 'rapidFire', endTime: newEndTime, originalCooldown: currentActualShootCooldown };
+                gameState.shootCooldown = gameState.rapidFireCooldownValue;
+            } else if (newAbilityType === 'timeSlow') { 
+                gameState.activeAbility = { type: newAbilityType, endTime: newEndTime };
+                gameState.isTimeSlowActive = true;
+                gameState.asteroids.forEach(a => {
+                    if (a.originalSpeed !== undefined) a.speed = a.originalSpeed * 0.3;
+                });
+                if (gameState.bossData) {
+                    if (gameState.bossData.originalSpeed !== undefined) gameState.bossData.speed = gameState.bossData.originalSpeed * 0.3;
+                    if (gameState.bossData.originalDownwardDriftSpeed !== undefined) gameState.bossData.downwardDriftSpeed = gameState.bossData.originalDownwardDriftSpeed * 0.3;
+                }
+            } else if (newAbilityType === 'ghost') { 
+                gameState.activeAbility = { type: newAbilityType, endTime: newEndTime };
+                gameState.player.isGhost = true;
+            }
+            else { 
+                gameState.activeAbility = { type: newAbilityType, endTime: newEndTime };
+            }
+
+            playPowerUpSound();
+            updateAbilityDisplay(currentTime);
+        }
+        
+        function deactivateCurrentAbilityVisualsAndLogicOnly() {
+            if (gameState.activeAbility) {
+                if (gameState.activeAbility.type === 'rapidFire') {
+                    gameState.shootCooldown = gameState.activeAbility.originalCooldown || gameState.defaultShootCooldown;
+                } else if (gameState.activeAbility.type === 'timeSlow') { 
+                    gameState.isTimeSlowActive = false;
+                     gameState.asteroids.forEach(a => {
+                        if (a.originalSpeed !== undefined) a.speed = a.originalSpeed;
+                    });
+                    if (gameState.bossData) {
+                        if (gameState.bossData.originalSpeed !== undefined) gameState.bossData.speed = gameState.bossData.originalSpeed;
+                        if (gameState.bossData.originalDownwardDriftSpeed !== undefined) gameState.bossData.downwardDriftSpeed = gameState.bossData.originalDownwardDriftSpeed;
+                    }
+                } else if (gameState.activeAbility.type === 'ghost') { 
+                    gameState.player.isGhost = false;
+                }
+            }
+        }
+
+        function deactivateCurrentAbility(currentTime) {
+            deactivateCurrentAbilityVisualsAndLogicOnly();
+            gameState.activeAbility = null;
+            updateAbilityDisplay(currentTime);
+        }
+
+        function updateActiveAbility(currentTime) {
+            if (gameState.activeAbility && currentTime > gameState.activeAbility.endTime) {
+                deactivateCurrentAbility(currentTime);
+            }
+            if (gameState.activeAbility && gameState.activeAbility.type === 'shield') {
+                gameState.shieldPulseTime = (gameState.shieldPulseTime + 0.1) % (Math.PI * 2);
+            }
+        }
+
+        function updateAbilityDisplay(currentTime) { 
+            if (gameState.activeAbility && currentTime < gameState.activeAbility.endTime) {
+                const timeLeft = Math.ceil((gameState.activeAbility.endTime - currentTime) / 1000);
+                let abilityName = gameState.activeAbility.type.replace(/([A-Z])/g, ' $1').toUpperCase();
+                abilityDisplayEl.textContent = `${abilityName}: ${timeLeft}s`;
+                abilityDisplayEl.style.color = ABILITY_COLORS[gameState.activeAbility.type] || '#a0a0ff';
+            } else {
+                abilityDisplayEl.textContent = '';
+                abilityDisplayEl.style.color = '#a0a0ff';
+            }
+        }
+
+        function updateMultiplier() { 
+            gameState.timeSinceLastHit++;
+            const multiplierResetTime = 240; 
+            if (gameState.timeSinceLastHit > multiplierResetTime) {
+                gameState.consecutiveHits = 0;
+                gameState.multiplier = 1;
+            }
+            gameState.multiplier = Math.min(8, Math.floor(gameState.consecutiveHits / 3) + 1); 
+            gameState.maxMultiplier = Math.max(gameState.maxMultiplier, gameState.multiplier);
+        }
+
+        function updateLevel() {
+            const scorePerLevel = 1500; 
+            const newLevel = Math.floor(gameState.score / scorePerLevel) + 1;
+            if (newLevel > gameState.level) {
+                gameState.level = newLevel;
+                showLevelUp();
+                playLevelUpSound();
+                if (gameState.health < 3 && gameState.level % 2 === 0) gameState.health++; 
+                
+                if (gameState.level % 4 === 0 && !gameState.bossActive) { 
+                    spawnBossAsteroid();
+                }
+            }
+        }
+
+        function showLevelUp() { 
+            const levelUpDiv = document.createElement('div');
+            levelUpDiv.className = 'level-up';
+            levelUpDiv.textContent = `LEVEL ${gameState.level}`;
+            gameContainer.appendChild(levelUpDiv);
+            setTimeout(() => { levelUpDiv.remove(); }, 2000);
+        }
+        
+        function triggerScreenFlash() {
+            const flash = document.createElement('div');
+            flash.className = 'screen-flash';
+            gameContainer.appendChild(flash);
+            setTimeout(() => flash.remove(), 300);
+        }
+
+
+        function checkCollisions(currentTime) {
+            if (!gameState.player || !gameState.running) return;
+            const { player } = gameState;
+            
+            for (let i = gameState.asteroids.length - 1; i >= 0; i--) {
+                const asteroid = gameState.asteroids[i];
+                if (!asteroid) continue;
+                const dx = player.x - asteroid.x;
+                const dy = player.y - asteroid.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < player.size * 0.8 + asteroid.size * 0.7) { 
+                    if (player.isGhost) {
+                        createExplosion(player.x, player.y, ABILITY_EXPLOSION_HUES.ghost, player.size * 0.5);
+                        continue; 
+                    }
+
+                    gameState.screenShake = 20; 
+                    triggerScreenFlash(); 
+                    playHitSound();
+                    
+                    if (gameState.bossData && asteroid.id === gameState.bossData.id) {
+                        if (gameState.activeAbility && gameState.activeAbility.type === 'shield' && currentTime < gameState.activeAbility.endTime) {
+                            deactivateCurrentAbility(currentTime);
+                            createExplosion(player.x, player.y, ABILITY_EXPLOSION_HUES.shield, player.size * 2);
+                            gameState.bossData.y -= NUDGE_PER_HIT * SHIELD_BOSS_NUDGE_FACTOR; 
+                            gameState.bossData.y = Math.max(-gameState.bossData.size * 0.5, gameState.bossData.y); 
+                        } else {
+                            gameState.health = 0; 
+                            endGame('crushed_by_boss');
+                            return; 
+                        }
+                    } else {
+                        createExplosion(asteroid.x, asteroid.y, 25, asteroid.size * 0.7); 
+                        gameState.asteroids.splice(i, 1); 
+                        gameState.nearMissCooldowns.delete(asteroid.id);
+                        
+                        if (gameState.activeAbility && gameState.activeAbility.type === 'shield' && currentTime < gameState.activeAbility.endTime) {
+                            deactivateCurrentAbility(currentTime);
+                            createExplosion(player.x, player.y, ABILITY_EXPLOSION_HUES.shield, player.size * 2); 
+                        } else {
+                            gameState.health--;
+                            gameState.consecutiveHits = 0;
+                            gameState.multiplier = 1;
+                            if (gameState.health <= 0) {
+                                endGame('player_defeated'); 
+                                return; 
+                            }
+                        }
+                    }
+                }
+            }
+            if (!gameState.running) return; 
+            
+            for (let bulletIndex = gameState.bullets.length - 1; bulletIndex >= 0; bulletIndex--) {
+                const bullet = gameState.bullets[bulletIndex];
+                if (!bullet) continue; 
+                for (let asteroidIndex = gameState.asteroids.length - 1; asteroidIndex >= 0; asteroidIndex--) {
+                    const asteroid = gameState.asteroids[asteroidIndex];
+                    if (!asteroid) continue; 
+
+                    const dx = bullet.x - asteroid.x;
+                    const dy = bullet.y - asteroid.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < bullet.size + asteroid.size * 0.8) { 
+                        gameState.bullets.splice(bulletIndex, 1); 
+                        
+                        asteroid.health = (asteroid.health || 1) - 1;
+                        asteroid.damageLevel++; 
+                        
+                        if (gameState.bossData && asteroid.id === gameState.bossData.id) {
+                            playBossHitSound();
+                            createExplosion(bullet.x, bullet.y, 10, asteroid.size * 0.1); 
+                            gameState.bossData.damageLevel = Math.floor((1 - (gameState.bossData.health / gameState.bossData.maxHealth)) * 5);
+                            gameState.bossData.y -= NUDGE_PER_HIT;
+                            gameState.bossData.y = Math.max(-gameState.bossData.size * 0.5, gameState.bossData.y); 
+
+                        } else {
+                             createExplosion(asteroid.x, asteroid.y, 25, asteroid.size * 0.3); 
+                        }
+
+                        if (asteroid.health <= 0) {
+                            if (!gameState.bossData || asteroid.id !== gameState.bossData.id) { 
+                                createExplosion(asteroid.x, asteroid.y, 35, asteroid.size * 0.8); 
+                                gameState.asteroids.splice(asteroidIndex, 1);
+                                gameState.nearMissCooldowns.delete(asteroid.id);
+                                gameState.asteroidsDestroyed++;
+                                gameState.consecutiveHits++;
+                                gameState.timeSinceLastHit = 0;
+                                const baseScore = Math.floor(asteroid.size * (asteroid.isBossComponent ? 0.5 : 1.5) ); 
+                                gameState.score += baseScore * gameState.multiplier;
+                                playExplosionSound();
+                            }
+                        } else if (!gameState.bossData || asteroid.id !== gameState.bossData.id) { 
+                            playHitSound(); 
+                        }
+                        break; 
+                    }
+                }
+            }
+
+            for (let bulletIndex = gameState.bullets.length - 1; bulletIndex >= 0; bulletIndex--) {
+                const bullet = gameState.bullets[bulletIndex];
+                if (!bullet) continue; 
+
+                for (let capsuleIndex = gameState.abilityCapsules.length - 1; capsuleIndex >= 0; capsuleIndex--) {
+                    const capsule = gameState.abilityCapsules[capsuleIndex];
+                    if (!capsule) continue;
+
+                    const bulletRect = {
+                        left: bullet.x - bullet.size / 2,
+                        right: bullet.x + bullet.size / 2,
+                        top: bullet.y - 10, 
+                        bottom: bullet.y + 10
+                    };
+                    const capsuleCircle = {
+                        x: capsule.x,
+                        y: capsule.y,
+                        radius: capsule.size
+                    };
+
+                    const closestX = Math.max(bulletRect.left, Math.min(capsuleCircle.x, bulletRect.right));
+                    const closestY = Math.max(bulletRect.top, Math.min(capsuleCircle.y, bulletRect.bottom));
+
+                    const distX = capsuleCircle.x - closestX;
+                    const distY = capsuleCircle.y - closestY;
+                    const distanceSquared = (distX * distX) + (distY * distY);
+
+                    if (distanceSquared < (capsuleCircle.radius * capsuleCircle.radius)) {
+                        createExplosion(capsule.x, capsule.y, ABILITY_EXPLOSION_HUES[capsule.type], capsule.size * 2);
+                        gameState.bullets.splice(bulletIndex, 1);
+                        gameState.abilityCapsules.splice(capsuleIndex, 1);
+                        activateAbility(capsule.type, currentTime);
+                        break; 
+                    }
+                }
+            }
+        }
+
+        function createExplosion(x, y, baseColorHue = 25, sizeFactor = 1) { 
+            const numParticles = Math.floor(10 + sizeFactor * 0.8); 
+            for (let i = 0; i < numParticles; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = (Math.random() * 3 + 1) * (sizeFactor * 0.05 + 1);
+                
+                const particle = getParticleFromPool();
+                particle.x = x;
+                particle.y = y;
+                particle.vx = Math.cos(angle) * speed;
+                particle.vy = Math.sin(angle) * speed;
+                particle.life = 25 + Math.random() * 25;
+                particle.maxLife = 50; // Use a fixed maxLife or one based on initial life for consistency
+                particle.size = Math.random() * 2 + 1 + sizeFactor * 0.05;
+                particle.color = `hsl(${baseColorHue + (Math.random() - 0.5) * 60}, 100%, ${55 + Math.random() * 35}%)`;
+                
+                gameState.particles.push(particle);
+            }
+        }
+
+
+        function updateParticles() {
+            const activeParticles = [];
+            for (let i = 0; i < gameState.particles.length; i++) {
+                const p = gameState.particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                p.vx *= 0.95;
+                p.vy *= 0.95;
+                if (p.life > 0) {
+                    activeParticles.push(p);
+                } else {
+                    releaseParticleToPool(p);
+                }
+            }
+            gameState.particles = activeParticles;
+        }
+
+        function updateScreenShake() { 
+            if (gameState.screenShake > 0) {
+                gameState.camera.x = (Math.random() - 0.5) * gameState.screenShake * 0.6; 
+                gameState.camera.y = (Math.random() - 0.5) * gameState.screenShake * 0.6;
+                gameState.screenShake *= 0.88; 
+                if (gameState.screenShake < 0.5) gameState.screenShake = 0;
+            } else {
+                gameState.camera.x = 0; gameState.camera.y = 0;
+            }
+        }
+
+        function drawPlayer() {
+            if (!gameState.player) return;
+            const { player, activeAbility } = gameState;
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            
+            let playerColor = '#00ffff'; 
+            let engineColor = '#ff4757'; 
+
+            if (player.isGhost) {
+                ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 100) * 0.2; // Date.now() for visual effect is fine
+                playerColor = ABILITY_COLORS.ghost;
+            } else if (activeAbility && Date.now() < activeAbility.endTime) { // Date.now() for visual effect
+                playerColor = ABILITY_COLORS[activeAbility.type] || playerColor;
+                 if (activeAbility.type === 'rapidFire') engineColor = '#FFA500'; 
+            }
+
+            ctx.fillStyle = playerColor;
+            ctx.shadowColor = playerColor;
+            ctx.shadowBlur = player.isGhost ? 5 : 15;
+            ctx.beginPath();
+            ctx.moveTo(0, -player.size); 
+            ctx.lineTo(-player.size * 0.8, player.size * 0.6); 
+            ctx.lineTo(player.size * 0.8, player.size * 0.6);  
+            ctx.closePath();
+            ctx.fill();
+
+            let thrusterBaseY = player.size * 0.6;
+             if (player.thrusterSize > 0) {
+                ctx.fillStyle = engineColor;
+                ctx.shadowColor = engineColor;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+
+                if(player.lastMoveDir.y < 0) { 
+                    ctx.moveTo(0, thrusterBaseY);
+                    ctx.lineTo(-player.size * 0.4, thrusterBaseY + player.thrusterSize);
+                    ctx.lineTo(player.size * 0.4, thrusterBaseY + player.thrusterSize);
+                } else if (player.lastMoveDir.x !== 0 && player.lastMoveDir.y === 0) { 
+                    const thrusterOffsetX = player.lastMoveDir.x * player.size * 0.3;
+                    const flameDirectionX = -player.lastMoveDir.x; 
+                    ctx.moveTo(thrusterOffsetX, thrusterBaseY * 0.5); 
+                    ctx.lineTo(thrusterOffsetX + flameDirectionX * player.thrusterSize * 0.7, thrusterBaseY * 0.5 - player.thrusterSize * 0.3);
+                    ctx.lineTo(thrusterOffsetX + flameDirectionX * player.thrusterSize * 0.7, thrusterBaseY * 0.5 + player.thrusterSize * 0.3);
+                } else { 
+                    ctx.moveTo(0, thrusterBaseY);
+                    ctx.lineTo(-player.size * 0.3, thrusterBaseY + player.thrusterSize * 0.7);
+                    ctx.lineTo(player.size * 0.3, thrusterBaseY + player.thrusterSize * 0.7);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            ctx.shadowBlur = 0; 
+            ctx.globalAlpha = 1.0; 
+
+            if (activeAbility && activeAbility.type === 'shield' && Date.now() < activeAbility.endTime) { // Date.now() for visual
+                drawShield(player.size);
+            }
+            ctx.restore();
+        }
+        
+        function drawShield(playerSize) { 
+            ctx.beginPath();
+            const shieldRadius = playerSize * 1.8 + Math.sin(gameState.shieldPulseTime) * 3;
+            const shieldOpacity = 0.3 + Math.sin(gameState.shieldPulseTime * 1.5) * 0.2; 
+            ctx.strokeStyle = `rgba(100, 200, 255, ${shieldOpacity})`;
+            ctx.lineWidth = 2 + Math.sin(gameState.shieldPulseTime * 2) * 1; 
+            ctx.arc(0, 0, shieldRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(100, 200, 255, ${shieldOpacity * 0.3})`;
+            ctx.arc(0, 0, shieldRadius * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawBullets() { 
+             ctx.shadowBlur = 8;
+            gameState.bullets.forEach(bullet => {
+                ctx.fillStyle = '#33FF33'; 
+                ctx.shadowColor = '#33FF33';
+                ctx.beginPath(); ctx.rect(bullet.x - bullet.size / 2, bullet.y - 10, bullet.size, 20); ctx.fill();
+                ctx.fillStyle = '#BBFFBB';
+                ctx.beginPath(); ctx.rect(bullet.x - bullet.size / 4, bullet.y - 8, bullet.size / 2, 16); ctx.fill();
+            });
+            ctx.shadowBlur = 0;
+        }
+
+        function drawAsteroids(asteroidsArray) {
+            (asteroidsArray || []).forEach(asteroid => {
+                ctx.save();
+                ctx.translate(asteroid.x, asteroid.y);
+                ctx.rotate(asteroid.rotation);
+                
+                if (asteroid === hitterAsteroid) { 
+                    ctx.shadowColor = 'rgba(255,150,50,0.9)';
+                    ctx.shadowBlur = 40;
+                }
+
+                ctx.beginPath();
+                asteroid.shapePoints.forEach((p, index) => {
+                    if (index === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+                });
+                ctx.closePath();
+
+                const baseColor = asteroid.color || '#888890';
+                const lightColor = lightenColor(baseColor, 20);
+                const darkColor = darkenColor(baseColor, 20);
+
+                const gradient = ctx.createRadialGradient(0, 0, asteroid.size * 0.2, 0, 0, asteroid.size);
+                gradient.addColorStop(0, lightColor); 
+                gradient.addColorStop(1, darkColor); 
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                ctx.strokeStyle = darkenColor(baseColor, 30); 
+                ctx.lineWidth = (gameState.bossData && asteroid.id === gameState.bossData.id && !asteroid.isMenu) ? 3 : (asteroid.isBossComponent && !asteroid.isMenu ? 2 : 1.5);
+                ctx.stroke();
+
+                if (asteroid.damageLevel > 0 && !asteroid.isBossComponent && !asteroid.isMenu && (!gameState.bossData || asteroid.id !== gameState.bossData.id)) { 
+                    ctx.strokeStyle = 'rgba(50, 50, 50, 0.7)';
+                    ctx.lineWidth = Math.max(1, asteroid.size / 20);
+                    for (let i = 0; i < asteroid.damageLevel; i++) {
+                        ctx.beginPath();
+                        const startAngle = Math.random() * Math.PI * 2;
+                        const endAngle = startAngle + (Math.random() - 0.5) * Math.PI * 0.8;
+                        const crackLength = asteroid.size * (0.4 + Math.random() * 0.4);
+                        ctx.moveTo(Math.cos(startAngle) * crackLength * 0.3, Math.sin(startAngle) * crackLength * 0.3); 
+                        ctx.lineTo(Math.cos(endAngle) * crackLength, Math.sin(endAngle) * crackLength); 
+                        ctx.stroke();
+                    }
+                }
+                if (gameState.bossData && asteroid.id === gameState.bossData.id && !asteroid.isMenu) {
+                    drawBossHealthBar(asteroid);
+                     if (gameState.bossData.damageLevel > 0) {
+                        ctx.fillStyle = `rgba(255, 50, 0, ${0.05 * gameState.bossData.damageLevel})`; 
+                        ctx.fill(); 
+                    }
+                }
+                 if (asteroid === hitterAsteroid) {
+                    ctx.shadowBlur = 0; 
+                }
+                ctx.restore();
+            });
+        }
+        
+        function lightenColor(color, percent) {
+            let r=128,g=128,b=128; 
+            if (color.startsWith('rgb')) {
+                const parts = color.match(/\d+/g);
+                r = parseInt(parts[0]); g = parseInt(parts[1]); b = parseInt(parts[2]);
+            } else if (color.startsWith('#')) {
+                const rgb = hexToRgb(color);
+                r = rgb.r; g = rgb.g; b = rgb.b;
+            }
+            const amount = Math.floor(255 * (percent/100));
+            r = Math.min(255, r + amount);
+            g = Math.min(255, g + amount);
+            b = Math.min(255, b + amount);
+            return `rgb(${r},${g},${b})`;
+        }
+        function darkenColor(color, percent) {
+            let r=128,g=128,b=128;
+             if (color.startsWith('rgb')) {
+                const parts = color.match(/\d+/g);
+                r = parseInt(parts[0]); g = parseInt(parts[1]); b = parseInt(parts[2]);
+            } else if (color.startsWith('#')) {
+                const rgb = hexToRgb(color);
+                r = rgb.r; g = rgb.g; b = rgb.b;
+            }
+            const amount = Math.floor(255 * (percent/100));
+            r = Math.max(0, r - amount);
+            g = Math.max(0, g - amount);
+            b = Math.max(0, b - amount);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function drawBossHealthBar(boss) {
+            const barWidth = boss.size * 1.5;
+            const barHeight = 15;
+            const barX = -barWidth / 2;
+            const barY = -boss.size * 0.8 - barHeight; 
+
+            ctx.fillStyle = 'rgba(50, 50, 50, 0.8)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+
+            const healthPercentage = Math.max(0, boss.health / boss.maxHealth);
+            ctx.fillStyle = healthPercentage > 0.5 ? '#4CAF50' : (healthPercentage > 0.2 ? '#FFC107' : '#F44336'); 
+            ctx.fillRect(barX, barY, barWidth * healthPercentage, barHeight);
+
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
+        }
+
+
+        function drawAbilityCapsules() { 
+            gameState.abilityCapsules.forEach(capsule => {
+                ctx.save(); ctx.translate(capsule.x, capsule.y);
+                const color = ABILITY_COLORS[capsule.type] || '#A0A0FF';
+                const symbol = ABILITY_SYMBOLS[capsule.type] || '?';
+                const pulseEffect = Math.sin(capsule.pulse) * 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, capsule.size + pulseEffect + 2, 0, Math.PI * 2);
+                const rgbColor = hexToRgb(color);
+                ctx.fillStyle = `rgba(${rgbColor.r}, ${rgbColor.g}, ${rgbColor.b}, 0.3)`;
+                ctx.fill();
+                ctx.fillStyle = color; ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(0, 0, capsule.size + pulseEffect, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = 'black'; ctx.font = `bold ${capsule.size * 1.2}px Arial`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, 0, 1); 
+                ctx.restore();
+            });
+        }
+        
+        function hexToRgb(hex) { 
+            let r = 0, g = 0, b = 0;
+            if (!hex) return {r:160, g:160, b:255}; 
+            if (hex.length == 4) { 
+                r = parseInt(hex[1] + hex[1], 16); g = parseInt(hex[2] + hex[2], 16); b = parseInt(hex[3] + hex[3], 16);
+            } else if (hex.length == 7) { 
+                r = parseInt(hex[1] + hex[2], 16); g = parseInt(hex[3] + hex[4], 16); b = parseInt(hex[5] + hex[6], 16);
+            } else { 
+                 return {r:160, g:160, b:255}; // Default if format is unexpected
+            }
+            return { r, g, b };
+        }
+
+
+        function drawParticles() { 
+            (gameState.particles || []).forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, Math.max(0.5, p.size * (p.life / p.maxLife)) + 0.5, 0, Math.PI * 2); 
+                const alpha = Math.max(0, p.life / p.maxLife);
+                if (p.color.startsWith('hsl')) {
+                    const parts = p.color.match(/(\d+(\.\d+)?)/g); 
+                    if (parts && parts.length >=3) {
+                       ctx.fillStyle = `hsla(${parts[0]}, ${parts[1]}%, ${parts[2]}%, ${alpha})`;
+                    } else {
+                       ctx.fillStyle = `hsla(0, 0%, 100%, ${alpha})`; 
+                    }
+                } else { 
+                    ctx.fillStyle = p.color; // Should not happen if color is always HSL
+                }
+                ctx.fill();
+            });
+        }
+
+        function drawDangerZone() {
+            if (!gameState.bossActive) return;
+            const zoneY = H - DANGER_ZONE_HEIGHT;
+            
+            ctx.save();
+            const alpha = 0.2 + Math.sin(Date.now() / 200) * 0.15; // Date.now() for visual effect is fine
+            ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+            ctx.fillRect(0, zoneY, W, DANGER_ZONE_HEIGHT);
+
+            ctx.strokeStyle = 'rgba(255, 50, 50, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, zoneY);
+            ctx.lineTo(W, zoneY);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function updateUI(currentTime) { 
+            scoreEl.textContent = gameState.score !== undefined ? gameState.score : 0;
+            healthEl.textContent = gameState.health !== undefined ? gameState.health : 3;
+            levelEl.textContent = gameState.level !== undefined ? gameState.level : 1;
+            multiplierEl.textContent = (gameState.multiplier !== undefined ? gameState.multiplier : 1) + 'x';
+            updateAbilityDisplay(currentTime); 
+        }
+
+        function distSq(x1, y1, x2, y2) {
+            return (x2 - x1)**2 + (y2 - y1)**2;
+        }
+        
+        function generateJaggedFragmentShape(size) {
+            const points = [];
+            const numVertices = 3 + Math.floor(Math.random() * 3); 
+            for (let i = 0; i < numVertices; i++) {
+                const angle = (i / numVertices) * Math.PI * 2 + (Math.random() - 0.5) * 0.5; 
+                const radius = size * (0.5 + Math.random() * 0.8); 
+                points.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+            }
+            return points;
+        }
+
+        function createButtonFragments(cx, cy) {
+            buttonFragments = [];
+            const numFragments = 10 + Math.floor(Math.random() * 6);
+            const fragmentBaseSize = 25;
+            const buttonColors = ['#667eea', '#7064c2', '#764ba2', '#6a67e9', '#7352b2']; 
+
+            for (let i = 0; i < numFragments; i++) {
+                const angle = (Math.PI * 2 / numFragments) * i + (Math.random() - 0.5) * 0.8; 
+                const distFromCenter = Math.random() * 15; 
+                const initialSpeed = 1.5 + Math.random() * 2.5;
+
+                buttonFragments.push({
+                    x: cx + Math.cos(angle) * distFromCenter,
+                    y: cy + Math.sin(angle) * distFromCenter,
+                    size: fragmentBaseSize * (0.4 + Math.random() * 0.6),
+                    vx: Math.cos(angle) * initialSpeed + (Math.random() - 0.5) * 2.5,
+                    vy: Math.sin(angle) * initialSpeed + (Math.random() * 1.0 - 0.5), 
+                    rotation: Math.random() * Math.PI * 2,
+                    rotationSpeed: (Math.random() - 0.5) * 0.25,
+                    life: 60 + Math.random() * 50, 
+                    maxLife: 110, 
+                    color: buttonColors[Math.floor(Math.random() * buttonColors.length)],
+                    shapePoints: generateJaggedFragmentShape(fragmentBaseSize * (0.4 + Math.random() * 0.6))
+                });
+            }
+        }
+        function updateButtonFragments() {
+            buttonFragments = buttonFragments.filter(f => {
+                f.x += f.vx;
+                f.y += f.vy;
+                f.vy += 0.12; 
+                f.vx *= 0.985; 
+                f.rotation += f.rotationSpeed;
+                f.life--;
+                return f.life > 0;
+            });
+        }
+        function drawButtonFragments() {
+            buttonFragments.forEach(f => {
+                ctx.save();
+                ctx.translate(f.x, f.y);
+                ctx.rotate(f.rotation);
+                ctx.globalAlpha = Math.max(0, f.life / (f.maxLife * 0.7)); 
+
+                ctx.beginPath();
+                f.shapePoints.forEach((p, index) => {
+                    if (index === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+                });
+                ctx.closePath();
+                
+                ctx.fillStyle = f.color;
+                ctx.fill();
+                
+                ctx.strokeStyle = darkenColor(f.color, 15);
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                ctx.restore();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+
+        function prepareButtonHitAnimation() {
+            startGameBtn.disabled = true;
+            const buttonRect = startGameBtn.getBoundingClientRect();
+            const gameContainerRect = gameContainer.getBoundingClientRect();
+
+            const buttonCenterX = buttonRect.left - gameContainerRect.left + buttonRect.width / 2;
+            const buttonCenterY = buttonRect.top - gameContainerRect.top + buttonRect.height / 2;
+
+            hitterAsteroid = {
+                x: Math.random() * W * 0.6 + W * 0.2, 
+                y: -60, 
+                size: 50 + Math.random() * 20, 
+                speed: 7 + Math.random() * 3, 
+                angle: 0, 
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.1,
+                shapePoints: [], 
+                color: 'rgb(255, 100, 50)', 
+                isMenu: true
+            };
+            hitterAsteroid.shapePoints = generateAsteroidShapePoints(hitterAsteroid.size);
+            hitterAsteroid.angle = Math.atan2(buttonCenterY - hitterAsteroid.y, buttonCenterX - hitterAsteroid.x);
+            
+            if (menuAnimationFrameId) {
+                cancelAnimationFrame(menuAnimationFrameId);
+                menuAnimationFrameId = null;
+            }
+            buttonFragments = []; 
+            buttonHitSequenceLoop(buttonCenterX, buttonCenterY);
+        }
+
+        function buttonHitSequenceLoop(targetX, targetY) {
+            ctx.clearRect(0, 0, W, H);
+            
+            if (!hitterAsteroid) {
+                updateMenuAsteroids();
+            }
+            drawAsteroids(menuAsteroids.filter(a => a !== hitterAsteroid)); 
+
+            if (hitterAsteroid) {
+                hitterAsteroid.x += Math.cos(hitterAsteroid.angle) * hitterAsteroid.speed;
+                hitterAsteroid.y += Math.sin(hitterAsteroid.angle) * hitterAsteroid.speed;
+                hitterAsteroid.rotation += hitterAsteroid.rotationSpeed;
+                drawAsteroids([hitterAsteroid]); 
+
+                if (distSq(hitterAsteroid.x, hitterAsteroid.y, targetX, targetY) < (hitterAsteroid.size * hitterAsteroid.size * 0.8)) { 
+                    playExplosionSound();
+                    createExplosion(hitterAsteroid.x, hitterAsteroid.y, 30, hitterAsteroid.size * 1.2);
+                    
+                    startGameBtn.style.visibility = 'hidden'; 
+                    createButtonFragments(targetX, targetY); 
+
+                    hitterAsteroid = null; 
+                }
+            }
+            
+            updateParticles(); 
+            drawParticles();
+
+            updateButtonFragments();
+            drawButtonFragments();
+
+            if (hitterAsteroid || (gameState.particles && gameState.particles.length > 0) || buttonFragments.length > 0) {
+                 buttonHitAnimationId = requestAnimationFrame(() => buttonHitSequenceLoop(targetX, targetY));
+            } else {
+                 onButtonAnimationEnd();
+            }
+        }
+        
+        function onButtonAnimationEnd() {
+            if (buttonHitAnimationId) cancelAnimationFrame(buttonHitAnimationId);
+            buttonHitAnimationId = null;
+            
+            startScreen.classList.add('hidden');
+            
+            startGameBtn.disabled = false;
+            startGameBtn.style.visibility = 'visible';
+            startGameBtn.style.transform = '';
+            startGameBtn.style.opacity = '';
+
+            menuAsteroids = []; 
+            buttonFragments = []; 
+            if(gameState.particles) gameState.particles = []; 
+
+            resetGameState();
+
+            gameState.player.y = H + gameState.player.size * 2;
+            const targetPlayerY = gameState.playerStartY;
+
+            playerEmergeSequenceLoop(targetPlayerY);
+        }
+
+        function playerEmergeSequenceLoop(targetY) {
+            ctx.clearRect(0, 0, W, H);
+            
+            gameState.player.y -= 4; // Constant speed for simplicity, could be time-based
+            if (gameState.player.y < targetY) {
+                gameState.player.y = targetY;
+            }
+            
+            gameState.player.thrusterSize = gameState.player.size * (0.8 + Math.sin(Date.now()/50) * 0.2); // Date.now() visual fine
+            gameState.player.lastMoveDir = {x:0, y:-1};
+
+            drawPlayer();
+            
+            updateParticles(); 
+            drawParticles();
+
+            if (gameState.player.y > targetY || (gameState.particles && gameState.particles.length > 0)) {
+                playerEmergeAnimationId = requestAnimationFrame(() => playerEmergeSequenceLoop(targetY));
+            } else {
+                if (playerEmergeAnimationId) cancelAnimationFrame(playerEmergeAnimationId);
+                playerEmergeAnimationId = null;
+                isStartingGameAnimation = false;
+                
+                gameState.running = true;
+                gameState.paused = false;
+                pauseTextEl.classList.add('hidden');
+                gameState.lastTime = performance.now();
+                if (musicEnabled && audioContext) startBackgroundMusic();
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function startGame(isQuickStart = false) {
+            initAudio(); 
+
+            if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+            if (menuAnimationFrameId) { cancelAnimationFrame(menuAnimationFrameId); menuAnimationFrameId = null; }
+            if (buttonHitAnimationId) { cancelAnimationFrame(buttonHitAnimationId); buttonHitAnimationId = null; }
+            if (playerEmergeAnimationId) { cancelAnimationFrame(playerEmergeAnimationId); playerEmergeAnimationId = null; }
+            
+            isStartingGameAnimation = false;
+            hitterAsteroid = null;
+            buttonFragments = [];
+            if (gameState.particles) gameState.particles = [];
+
+            startGameBtn.style.visibility = 'visible';
+            startGameBtn.style.transform = '';
+            startGameBtn.style.opacity = '';
+            startGameBtn.disabled = false;
+
+
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            menuAsteroids = []; 
+
+            if (isQuickStart) {
+                resetGameState();
+                gameState.running = true;
+                gameState.paused = false;
+                pauseTextEl.classList.add('hidden');
+                gameState.lastTime = performance.now();
+                if (musicEnabled && audioContext) startBackgroundMusic();
+                animationFrameId = requestAnimationFrame(gameLoop);
+            } else {
+                isStartingGameAnimation = true;
+                
+                startScreen.classList.remove('hidden'); 
+                ctx.clearRect(0, 0, W, H);
+
+                menuAnimationLoop(); 
+                prepareButtonHitAnimation(); 
+            }
+        }
+        
+        startGameBtn.addEventListener('click', () => startGame(false));
+        restartGameBtn.addEventListener('click', () => startGame(true));
+
+
+        function endGame(reason = 'player_defeated') {
+            if (!gameState.running) return; 
+            gameState.running = false;
+            stopBackgroundMusic();
+            if (sfxEnabled && audioContext && (!gameState.bossData || gameState.bossData.health > 0)) {
+                playExplosionSound(); 
+            }
+
+            checkAndSetHighScore(); 
+
+            finalScoreEl.textContent = gameState.score;
+            finalLevelEl.textContent = gameState.level;
+            finalAsteroidsEl.textContent = gameState.asteroidsDestroyed;
+            finalMultiplierEl.textContent = gameState.maxMultiplier + 'x';
+            
+            switch(reason) {
+                case 'earth_destroyed':
+                    gameOverReasonEl.textContent = "THE BOSS REACHED EARTH! PLANET DESTROYED.";
+                    break;
+                case 'crushed_by_boss':
+                    gameOverReasonEl.textContent = "CRUSHED BY THE BOSS!";
+                    break;
+                case 'player_defeated':
+                default:
+                    gameOverReasonEl.textContent = "You were overwhelmed by asteroids!";
+                    break;
+            }
+            
+            updateHighScoreDisplay(); 
+            
+            gameOverScreen.classList.remove('hidden');
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+        
+        function gameLoop(timestamp) { // timestamp is provided by requestAnimationFrame
+            if (!gameState.running) {
+                 animationFrameId = null; 
+                 return;
+            }
+            if (gameState.paused) {
+                // If paused, we don't request another frame until unpaused
+                return; 
+            }
+
+            const currentTime = timestamp; // Use timestamp for more accurate timing if needed, or Date.now()
+                                         // For simplicity and current structure, using Date.now() internally for most things.
+                                         // Or pass `currentTime` or `deltaTime` to update functions.
+                                         // Let's stick with Date.now() for this iteration for consistency with existing logic.
+            const now = Date.now();
+
+
+            updatePlayer(now);
+            updateBullets();
+            updateAsteroids(now);
+            if (gameState.bossActive) updateBoss(now); 
+            if (!gameState.running) return; // Boss update might end game
+
+            updateAbilityCapsules(); // Uses its own Math.random for spawn, not time critical for updates
+            updateActiveAbility(now);
+            updateMultiplier(); // Time based via frame count (timeSinceLastHit)
+            updateLevel(); 
+            checkCollisions(now); 
+            if (!gameState.running) return; // Collisions might end game
+
+            updateParticles();
+            updateScreenShake();
+            
+            // Drawing
+            ctx.clearRect(0, 0, W, H);
+            ctx.save();
+            ctx.translate(gameState.camera.x, gameState.camera.y);
+
+            drawPlayer();
+            drawBullets();
+            drawAsteroids(gameState.asteroids);
+            drawAbilityCapsules();
+            drawParticles();
+            drawDangerZone(); 
+            
+            ctx.restore(); 
+            updateUI(now);
+            
+            gameState.lastTime = now; // Store time for next frame's deltaTime calculation (if used more extensively)
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function handleResize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+            createStars(); 
+
+            if (gameState && gameState.player) {
+                const playerHalfWidth = gameState.player.size * 0.8;
+                const playerTopExtent = gameState.player.size;
+                const playerBottomExtent = gameState.player.size * 0.6;
+
+                // Recenter player if game not running, or adjust if it is.
+                if(!gameState.running){
+                    gameState.player.x = W / 2;
+                } else {
+                    gameState.player.x = Math.max(playerHalfWidth, Math.min(W - playerHalfWidth, gameState.player.x));
+                }
+                
+                if (gameState.playerStartY !== undefined) {
+                    gameState.playerStartY = H - 80;
+                     if(!gameState.running){
+                         gameState.player.y = gameState.playerStartY;
+                     }
+                }
+                gameState.player.y = Math.max(playerTopExtent, Math.min(H - playerBottomExtent, gameState.player.y));
+            }
+            // If boss exists, adjust its target positions if they are screen relative
+            if (gameState.bossData) {
+                if (gameState.bossData.targetX > W - gameState.bossData.size) gameState.bossData.targetX = W - gameState.bossData.size * 1.5;
+                if (gameState.bossData.targetY > H * 0.5) gameState.bossData.targetY = H * 0.4;
+            }
+            
+            if (!startScreen.classList.contains('hidden') && !isStartingGameAnimation && !menuAnimationFrameId) {
+                 menuAnimationLoop();
+            }
+        }
+        window.addEventListener('resize', handleResize);
+
+        window.onload = () => {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+            createStars();
+            resetGameState(); 
+            updateUI(Date.now()); 
+            updateHighScoreDisplay();
+            startScreen.classList.remove('hidden');
+            gameOverScreen.classList.add('hidden');
+            if (!menuAnimationFrameId) {
+                 menuAnimationLoop();
+            }
+        };
+
+    </script>
+</body>
+</html>
