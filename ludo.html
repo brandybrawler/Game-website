@@ -6,11 +6,10 @@
     <title>Ludo - Bunny Hop Edition</title>
     <style>
         :root {
-            --board-size: clamp(450px, 90vmin, 700px);
+            --board-size: clamp(320px, 90vmin, 650px);
             --cell-size: calc(var(--board-size) / 15);
             --pawn-size: calc(var(--cell-size) * 0.7);
             --hop-duration: 0.2s;
-            --hop-interval: 0.25s;
 
             --red-color: #d63031;
             --green-color: #00b894;
@@ -39,10 +38,11 @@
 
         #game-container {
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: row;
             justify-content: center;
             gap: 30px;
             align-items: center;
+            width: 100%;
         }
 
         #board {
@@ -57,6 +57,7 @@
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%23c89666"/><path d="M 0,10 C 20,0, 40,0, 60,10 C 80,20, 80,30, 80,40 C 70,60, 60,80, 40,80 C 20,80, 0,60, 0,40z" fill-opacity="0.1" fill="%235a3a22"/><path d="M 80,10 C 60,0, 40,0, 20,10 C 0,20, 0,30, 0,40 C 10,60, 20,80, 40,80 C 60,80, 80,60, 80,40z" fill-opacity="0.1" fill="%235a3a22"/></svg>');
             box-shadow: 0 15px 30px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.3);
             position: relative;
+            flex-shrink: 0;
         }
         
         #board::before {
@@ -96,11 +97,6 @@
         .finish-path.yellow { background-color: var(--yellow-color); box-shadow: inset 0 0 8px rgba(0,0,0,0.4); }
         .finish-path.blue { background-color: var(--blue-color); box-shadow: inset 0 0 8px rgba(0,0,0,0.4); }
 
-        .switch-square {
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M 50,10 A 40,40 0 1 1 10,50" fill="none" stroke="%233498db" stroke-width="8"/><path d="M 50,90 A 40,40 0 1 1 90,50" fill="none" stroke="%23e74c3c" stroke-width="8"/><path d="M 40 15 L 50 5 L 60 15" fill="%233498db"/><path d="M 40 85 L 50 95 L 60 85" fill="%23e74c3c"/></svg>');
-            background-size: 80%; background-repeat: no-repeat; background-position: center; animation: spin 5s linear infinite;
-        }
-
         .pawn {
             position: absolute; z-index: 10;
             width: var(--pawn-size); height: var(--pawn-size);
@@ -129,7 +125,8 @@
         #game-info {
             display: flex; flex-direction: column; align-items: center;
             background-color: rgba(44, 62, 80, 0.8); padding: 20px; border-radius: 15px;
-            width: 280px; border: 1px solid rgba(255,255,255,0.1);
+            width: 280px;
+            border: 1px solid rgba(255,255,255,0.1);
             backdrop-filter: blur(10px); box-shadow: 0 10px 20px rgba(0,0,0,0.3);
         }
         #status { font-size: 1.2em; text-align: center; min-height: 50px; margin-bottom: 20px; }
@@ -140,7 +137,7 @@
             transition: transform 0.3s, border-color 0.3s; box-shadow: 0 5px 10px rgba(0,0,0,0.2);
         }
         #dice.active { border-color: var(--current-player-color); animation: jiggle 0.5s; }
-        #dice.rolling { animation: spin 0.5s; }
+        #dice.rolling { animation: dice-spin 0.5s; }
 
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .modal-content {
@@ -149,112 +146,72 @@
             margin: auto;
             padding: 30px;
             border: 1px solid rgba(255, 255, 255, 0.2); 
-            width: 80%;
+            width: 90%;
             max-width: 500px;
             border-radius: 15px;
             text-align: center;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4); 
-            backdrop-filter: blur(8px);
         }
         .modal-content h2 { margin-top: 0; color: #fff; }
-        #switch-options { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px; }
-        .switch-pawn { width: 50px; height: 50px; border-radius: 50%; cursor: pointer; border: 3px solid #ccc; background-size: cover; background-position: center; }
-        .switch-pawn.red { background: radial-gradient(circle at 30% 30%, #e55039, #c0392b); }
-        .switch-pawn.green { background: radial-gradient(circle at 30% 30%, #1dd1a1, #00b894); }
-        .switch-pawn.yellow { background: radial-gradient(circle at 30% 30%, #feca57, #f39c12); }
-        .switch-pawn.blue { background: radial-gradient(circle at 30% 30%, #48dbfb, #0984e3); }
-        .switch-pawn:hover { border-color: #fff; transform: scale(1.1); }
 
-        #main-menu {
-            display: flex; 
-        }
-        #main-menu .modal-content {
-            max-width: 600px;
-        }
-        .menu-section {
-            margin-bottom: 25px;
-        }
-        .menu-section h3 {
-            margin-bottom: 15px;
-            color: #bdc3c7; 
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding-bottom: 10px;
-            font-weight: 300;
-        }
-        .player-count-selector label {
-            margin: 0 10px;
-            font-size: 1.2em;
-            cursor: pointer;
-        }
-        .player-color-selectors {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        .player-selector {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background-color: rgba(0,0,0,0.25);
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .player-selector span {
-            font-weight: bold;
-            color: #fff;
-        }
-        .color-options {
-            display: flex;
-            gap: 10px;
-        }
-        .color-choice {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 4px solid transparent;
-            transition: all 0.2s;
-        }
-        .color-choice:hover {
-            transform: scale(1.1);
-        }
-        .color-choice.selected {
-            border-color: #3498db;
-            box-shadow: 0 0 10px #3498db;
-        }
-        .color-choice.taken {
-            cursor: not-allowed;
-            opacity: 0.3;
-            transform: scale(0.9);
-        }
-        #start-game-btn {
-            padding: 12px 30px;
-            font-size: 1.2em;
-            background-color: #27ae60;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        #start-game-btn:disabled {
-            background-color: #95a5a6;
-            cursor: not-allowed;
-        }
-        #start-game-btn:not(:disabled):hover {
-            background-color: #2ecc71;
-        }
+        #main-menu { display: flex; }
+        
+        .menu-section { margin-bottom: 25px; }
+        .menu-section h3 { margin-bottom: 15px; color: #bdc3c7; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; font-weight: 300; }
+        .player-count-selector label { margin: 0 10px; font-size: 1.2em; cursor: pointer; }
+        .player-color-selectors { display: flex; flex-direction: column; gap: 15px; }
+        .player-selector { display: flex; justify-content: space-between; align-items: center; padding: 15px; background-color: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+        .player-selector span { font-weight: bold; color: #fff; }
+        .color-options { display: flex; gap: 10px; }
+        .color-choice { width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 4px solid transparent; transition: all 0.2s; }
+        
+        .color-choice.red { background-color: var(--red-color); }
+        .color-choice.green { background-color: var(--green-color); }
+        .color-choice.yellow { background-color: var(--yellow-color); }
+        .color-choice.blue { background-color: var(--blue-color); }
+
+        .color-choice:hover { transform: scale(1.1); }
+        .color-choice.selected { border-color: #3498db; box-shadow: 0 0 10px #3498db; }
+        .color-choice.taken { cursor: not-allowed; opacity: 0.3; transform: scale(0.9); }
+        
+        #start-game-btn { padding: 12px 30px; font-size: 1.2em; background-color: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
+        #start-game-btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        #start-game-btn:not(:disabled):hover { background-color: #2ecc71; }
 
         @keyframes pulse-glow {
             0%, 100% { transform: scale(1); box-shadow: 0 4px 8px rgba(0,0,0,0.5), 0 0 0 0px var(--current-player-color-glow); }
             50% { transform: scale(1.1); box-shadow: 0 6px 12px rgba(0,0,0,0.4), 0 0 15px 5px var(--current-player-color-glow); }
         }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes dice-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes jiggle {
             0%, 100% { transform: scale(1) rotate(0deg); }
             25% { transform: scale(1.05) rotate(-5deg); }
             75% { transform: scale(1.05) rotate(5deg); }
+        }
+
+        @media (max-width: 850px) {
+            body {
+                padding: 10px;
+                min-height: 0;
+            }
+            #game-container {
+                flex-direction: column;
+                gap: 20px;
+            }
+            #game-info {
+                width: 100%;
+                max-width: var(--board-size);
+                padding: 15px;
+            }
+            #game-info h1 {
+                font-size: 1.5rem;
+                margin-top: 0;
+                margin-bottom: 10px;
+            }
+            #status {
+                min-height: 40px;
+                margin-bottom: 15px;
+            }
         }
     </style>
 </head>
@@ -289,14 +246,6 @@
         </div>
     </div>
 
-    <div id="switch-modal" class="modal">
-        <div class="modal-content">
-            <h2>Switch Pawns!</h2>
-            <p>You landed on a swirling portal! Choose an opponent's pawn to swap places with.</p>
-            <div id="switch-options"></div>
-        </div>
-    </div>
-
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- Game Elements ---
@@ -304,8 +253,6 @@
             const board = document.getElementById('board');
             const diceEl = document.getElementById('dice');
             const statusEl = document.getElementById('status');
-            const switchModal = document.getElementById('switch-modal');
-            const switchOptionsEl = document.getElementById('switch-options');
             const root = document.documentElement;
             const hopSound = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
             hopSound.volume = 0.5;
@@ -326,7 +273,6 @@
             const PLAYER_ORDER = ['red', 'green', 'yellow', 'blue'];
             const PATH_LENGTH = 52;
             const FINISH_PATH_LENGTH = 6;
-            const SWITCH_SQUARE_INDEX = 20;
 
             const PATH_DATA = {
                 PATH_COORDS: [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[7,0],[6,0]],
@@ -419,7 +365,6 @@
                     diceRolled: false,
                     isAnimating: false,
                     pawns: {},
-                    switchPawn: null,
                     gameWon: false
                 };
                 for (const color of PLAYER_ORDER) {
@@ -462,9 +407,6 @@
                     getCell(r,c).classList.add('start', color);
                 });
                 
-                const [sr, sc] = PATH_DATA.PATH_COORDS[SWITCH_SQUARE_INDEX];
-                getCell(sr,sc).classList.add('switch-square');
-
                 Object.entries(PATH_DATA.FINISH_PATH_COORDS).forEach(([color, coords]) => 
                     coords.forEach(c => getCell(c[0],c[1]).classList.add('finish-path', color))
                 );
@@ -502,10 +444,10 @@
                 }
                 const totalPath = PATH_LENGTH + FINISH_PATH_LENGTH;
                 if (position >= totalPath) {
-                    const [row, col] = [7, 7];
+                    const [row, col] = [7, 7]; // Center of the board
                     return [row * cellSize + centerOffset, col * cellSize + centerOffset];
                 }
-                if (position > PATH_LENGTH) {
+                if (position >= PATH_LENGTH) {
                     const finishIndex = position - PATH_LENGTH - 1;
                     const [row, col] = PATH_DATA.FINISH_PATH_COORDS[color][finishIndex];
                     return [row * cellSize + centerOffset, col * cellSize + centerOffset];
@@ -518,17 +460,19 @@
             const getGlobalPathIndex = (pawn) => pawn.position === -1 ? -1 : (pawn.position + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
 
             // --- Core Game Loop & Player Actions ---
-
             async function handleHumanRoll() {
                 if (gameState.isAnimating || gameState.diceRolled) return;
+                
                 await rollDice();
                 const movablePawns = findMovablePawns();
+                
                 if (movablePawns.length > 0) {
                     movablePawns.forEach(pawnId => document.getElementById(pawnId).classList.add('movable'));
                 } else {
+                    updateStatus(statusEl.innerHTML + " No possible moves.");
                     gameState.isAnimating = true;
-                    await sleep(800);
-                    switchPlayer();
+                    await sleep(1200);
+                    endTurn(false);
                 }
             }
 
@@ -543,28 +487,23 @@
                 const pawn = gameState.pawns[pawnId];
                 await movePawnWithAnimation(pawn);
                 checkForCapture(pawn);
-                const switched = await checkForSwitchSquare(pawn);
                 checkForWin();
 
-                if (gameState.gameWon) return;
-
-                if (gameState.diceValue !== 6 || switched) {
-                    switchPlayer();
-                } else { 
-                    gameState.diceRolled = false;
-                    gameState.isAnimating = false; // Allow next roll
-                    updateStatus("Rolled a 6! Roll again.");
-                }
+                await endTurn(gameState.diceValue === 6);
             }
 
             async function rollDice() {
                 diceEl.classList.add('rolling');
                 gameState.diceRolled = true;
+                gameState.isAnimating = true;
                 await sleep(400);
                 gameState.diceValue = Math.floor(Math.random() * 6) + 1;
                 diceEl.innerText = gameState.diceValue;
                 diceEl.classList.remove('rolling');
+                diceEl.classList.remove('active');
                 updateStatus();
+                await sleep(200);
+                gameState.isAnimating = false;
             }
 
             function findMovablePawns() {
@@ -572,7 +511,7 @@
                 return Object.values(gameState.pawns).filter(pawn => {
                     if (pawn.color !== currentPlayer || pawn.isFinished) return false;
                     if (pawn.position === -1) return gameState.diceValue === 6;
-                    return pawn.position + gameState.diceValue <= PATH_LENGTH + FINISH_PATH_LENGTH;
+                    return pawn.position + gameState.diceValue < PATH_LENGTH + FINISH_PATH_LENGTH;
                 }).map(pawn => pawn.id);
             }
 
@@ -581,7 +520,7 @@
                 const startPos = pawn.position;
                 const dice = gameState.diceValue;
 
-                if (startPos === -1) {
+                if (startPos === -1 && dice === 6) {
                     pawn.position = 0;
                     pawnEl.classList.add('hopping');
                     hopSound.currentTime=0; hopSound.play();
@@ -592,34 +531,34 @@
                     pawnEl.classList.remove('hopping');
                 } else {
                     for (let i = 1; i <= dice; i++) {
-                        pawn.position = startPos + i;
-                        if (pawn.position > PATH_LENGTH + FINISH_PATH_LENGTH) {
-                            pawn.position = startPos;
+                        const nextPos = startPos + i;
+                        if (nextPos >= PATH_LENGTH + FINISH_PATH_LENGTH) {
+                            pawn.position = startPos; // Revert if overshot, should be prevented by findMovablePawns
                             break;
                         }
+                        pawn.position = nextPos;
                         pawnEl.classList.add('hopping');
                         hopSound.currentTime=0; hopSound.play();
                         const [top, left] = getPawnCoords(pawn);
                         pawnEl.style.top = `${top}px`;
                         pawnEl.style.left = `${left}px`;
-                        await sleep(pawn.position > PATH_LENGTH ? 200 : 150);
+                        await sleep(pawn.position >= PATH_LENGTH ? 200 : 150);
                         pawnEl.classList.remove('hopping');
                         await sleep(50);
                     }
                 }
-                if (pawn.position === PATH_LENGTH + FINISH_PATH_LENGTH) pawn.isFinished = true;
+                if (pawn.position === PATH_LENGTH + FINISH_PATH_LENGTH - 1) pawn.isFinished = true;
             }
 
             function checkForCapture(movedPawn) {
-                if (movedPawn.isFinished || movedPawn.position < 0 || movedPawn.position > PATH_LENGTH) return false;
+                if (movedPawn.isFinished || movedPawn.position < 0 || movedPawn.position >= PATH_LENGTH) return;
                 
                 const movedGlobalIndex = getGlobalPathIndex(movedPawn);
                 const isSafeSquare = Object.values(PATH_DATA.START_POSITIONS).includes(movedGlobalIndex);
-                if (isSafeSquare) return false;
+                if (isSafeSquare) return;
                 
-                let captured = false;
                 Object.values(gameState.pawns).forEach(otherPawn => {
-                    if (otherPawn.color === movedPawn.color || otherPawn.position < 0) return;
+                    if (otherPawn.id === movedPawn.id || otherPawn.color === movedPawn.color || otherPawn.position < 0) return;
                     
                     if (getGlobalPathIndex(otherPawn) === movedGlobalIndex) {
                         updateStatus(`${movedPawn.color.toUpperCase()} captured ${otherPawn.color.toUpperCase()}'s pawn!`);
@@ -627,103 +566,8 @@
                         const otherPawnEl = document.getElementById(otherPawn.id);
                         const [top, left] = getPawnCoords(otherPawn);
                         otherPawnEl.style.top = `${top}px`; otherPawnEl.style.left = `${left}px`;
-                        captured = true;
                     }
                 });
-                return captured;
-            }
-            
-            async function checkForSwitchSquare(pawn) {
-                if (pawn.isFinished || pawn.position < 0) return false;
-                if (getGlobalPathIndex(pawn) !== SWITCH_SQUARE_INDEX) return false;
-                
-                gameState.switchPawn = pawn;
-                await promptForSwitch();
-                
-                return gameState.switchPawn === null;
-            }
-            
-            function promptForSwitch() {
-                const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
-                const isAI = gameState.playerTypes[currentPlayer] === 'ai';
-                updateStatus("Landed on a Switch Square!");
-                
-                const opponents = Object.values(gameState.pawns).filter(p => p.color !== gameState.switchPawn.color && p.position !== -1 && !p.isFinished);
-
-                return new Promise(async (resolve) => {
-                    if (opponents.length === 0) {
-                        updateStatus("No opponent pawns to switch with. Unlucky!");
-                        await sleep(1500);
-                        gameState.switchPawn = null;
-                        resolve();
-                        return;
-                    }
-
-                    if (isAI) {
-                        const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
-                        await sleep(1000);
-                        await executeSwitch(randomOpponent.id);
-                        resolve();
-                    } else {
-                        switchOptionsEl.innerHTML = opponents.map(p => `<div class="switch-pawn ${p.color}" data-pawn-id="${p.id}"></div>`).join('');
-                        
-                        const handleClick = async (e) => {
-                            if (!e.target.matches('.switch-pawn')) return;
-                            switchOptionsEl.removeEventListener('click', handleClick);
-                            await executeSwitch(e.target.dataset.pawnId);
-                            resolve();
-                        };
-                        
-                        switchOptionsEl.addEventListener('click', handleClick);
-                        switchModal.style.display = "flex";
-                    }
-                });
-            }
-            
-            // --- FIXED SWITCH LOGIC ---
-            async function executeSwitch(opponentPawnId) {
-                const myPawn = gameState.switchPawn;
-                if (!myPawn) return;
-                const opponentPawn = gameState.pawns[opponentPawnId];
-                
-                switchModal.style.display = 'none';
-
-                // 1. Swap the underlying data first. This is the source of truth.
-                [myPawn.position, opponentPawn.position] = [opponentPawn.position, myPawn.position];
-                
-                // 2. Get the DOM elements.
-                const myPawnEl = document.getElementById(myPawn.id);
-                const opPawnEl = document.getElementById(opponentPawn.id);
-
-                // 3. Get their NEW target coordinates based on the now-swapped data.
-                const [newMyTop, newMyLeft] = getPawnCoords(myPawn);
-                const [newOpTop, newOpLeft] = getPawnCoords(opponentPawn);
-
-                // 4. Animate both to their new positions simultaneously.
-                [myPawnEl, opPawnEl].forEach(el => el.classList.add('hopping'));
-                hopSound.currentTime = 0; 
-                hopSound.play();
-                
-                // A short delay for the "hop up" animation to start before the pawns move.
-                await sleep(100); 
-
-                myPawnEl.style.top = `${newMyTop}px`;
-                myPawnEl.style.left = `${newMyLeft}px`;
-                opPawnEl.style.top = `${newOpTop}px`;
-                opPawnEl.style.left = `${newOpLeft}px`;
-
-                // Wait for the CSS transition to complete.
-                await sleep(400); 
-                [myPawnEl, opPawnEl].forEach(el => el.classList.remove('hopping'));
-                
-                // 5. Clean up state and check for consequences of the move.
-                gameState.switchPawn = null;
-                
-                // Check if the player's pawn captured another piece at its new location.
-                checkForCapture(myPawn);
-                
-                // A brief final pause to let the user see the result.
-                await sleep(500);
             }
             
             function checkForWin() {
@@ -737,8 +581,33 @@
                     gameState.gameWon = true;
                 }
             }
+
+            async function endTurn(getsExtraRoll) {
+                if (gameState.gameWon) return;
+
+                if (getsExtraRoll) {
+                    gameState.diceRolled = false;
+                    gameState.isAnimating = false;
+                    const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
+                    updateStatus(`Rolled a 6! <strong style="color:${PLAYERS[currentPlayer].color}">${currentPlayer.toUpperCase()}</strong> gets another turn.`);
+                    
+                    if (gameState.playerTypes[currentPlayer] === 'ai') {
+                        diceEl.style.pointerEvents = 'none';
+                        await sleep(1000);
+                        executeAITurn();
+                    } else {
+                        diceEl.style.pointerEvents = 'auto';
+                        diceEl.classList.add("active");
+                    }
+                } else {
+                    await sleep(500);
+                    switchPlayer();
+                }
+            }
             
             function switchPlayer() {
+                if (gameState.gameWon) return;
+
                 gameState.isAnimating = false;
                 gameState.diceRolled = false;
                 gameState.diceValue = null;
@@ -748,9 +617,9 @@
                 
                 updateStatus();
 
-                if (gameState.playerTypes[currentPlayer] === 'ai' && !gameState.gameWon) {
+                if (gameState.playerTypes[currentPlayer] === 'ai') {
                     diceEl.style.pointerEvents = 'none';
-                    setTimeout(executeAITurn, 500);
+                    setTimeout(executeAITurn, 1000);
                 } else {
                     diceEl.style.pointerEvents = 'auto';
                 }
@@ -762,10 +631,11 @@
                 const playerInfo = PLAYERS[currentPlayer];
                 const playerType = gameState.playerTypes[currentPlayer];
 
-                if (message) statusEl.innerHTML = message;
-                else {
+                if (message) {
+                    statusEl.innerHTML = message;
+                } else {
                     const turnText = playerType === 'ai' 
-                        ? `<strong style="color:${playerInfo.color}">${currentPlayer.toUpperCase()} (AI)</strong>'s turn.`
+                        ? `<strong style="color:${playerInfo.color}">${currentPlayer.toUpperCase()} (AI)</strong> is thinking...`
                         : `It's <strong style="color:${playerInfo.color}">${currentPlayer.toUpperCase()}</strong>'s turn. Roll the dice!`;
                     statusEl.innerHTML = turnText;
                 }
@@ -781,9 +651,9 @@
             }
 
             async function executeAITurn() {
-                if (gameState.gameWon) return;
+                if (gameState.gameWon || gameState.isAnimating) return;
+                gameState.isAnimating = true;
 
-                gameState.isAnimating = true; 
                 const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
                 updateStatus(`${currentPlayer.toUpperCase()} (AI) is thinking...`);
                 await sleep(800);
@@ -799,27 +669,15 @@
 
                     await movePawnWithAnimation(pawnToMove);
                     checkForCapture(pawnToMove);
-                    const switched = await checkForSwitchSquare(pawnToMove);
                     checkForWin();
                     
-                    if (gameState.gameWon) {
-                        gameState.isAnimating = false;
-                        return;
-                    }
-
-                    if (gameState.diceValue === 6 && !switched) {
-                        updateStatus("Rolled a 6! AI plays again.");
-                        gameState.diceRolled = false;
-                        await sleep(1000);
-                        executeAITurn(); 
-                    } else {
-                        switchPlayer();
-                    }
+                    await endTurn(gameState.diceValue === 6);
                 } else {
                     updateStatus(`No moves for ${currentPlayer.toUpperCase()} (AI).`);
-                    await sleep(1000);
-                    switchPlayer();
+                    await sleep(1200);
+                    endTurn(false);
                 }
+                gameState.isAnimating = false;
             }
             
             function aiChooseBestMove(movablePawns) {
@@ -832,17 +690,22 @@
                     const newPos = (currentPos === -1) ? 0 : currentPos + dice;
                     let score = 0;
 
-                    score += newPos;
-                    if (newPos === PATH_LENGTH + FINISH_PATH_LENGTH) score += 1000;
+                    // Prioritize getting home
+                    if (newPos === PATH_LENGTH + FINISH_PATH_LENGTH - 1) score += 1000;
+                    // Prioritize getting out of home
                     if (currentPos === -1) score += 50;
+                    // General progress is good
+                    score += newPos;
                     
                     const newGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
                     const isSafe = Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex);
                     
+                    // Prioritize capturing an opponent
                     if (!isSafe && newPos < PATH_LENGTH) {
                         const opponentOnSquare = Object.values(gameState.pawns).some(op => op.color !== pawn.color && op.position !== -1 && getGlobalPathIndex(op) === newGlobalIndex);
                         if (opponentOnSquare) score += 75;
                     }
+                    // Prioritize landing on a safe square
                     if (isSafe) score += 40;
 
                     if(score > bestMove.score) {
