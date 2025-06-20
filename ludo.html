@@ -491,29 +491,41 @@
                     board.appendChild(pawnEl);
                 }
             }
-
+            
+            // --- ### START OF FIX ### ---
             function getPawnCoords({ id, color, position, isFinished }) {
                 const cellSize = board.clientWidth / 15;
                 const centerOffset = (cellSize - (cellSize * 0.7)) / 2;
+
                 if (position === -1) {
                     const homeIndex = parseInt(id.slice(-1));
                     const [row, col] = PATH_DATA.HOME_SPOTS[color][homeIndex];
                     return [row * cellSize + centerOffset, col * cellSize + centerOffset];
                 }
+
                 const totalPath = PATH_LENGTH + FINISH_PATH_LENGTH;
                 if (position >= totalPath) {
+                    // Pawn has finished and is in the center
                     const [row, col] = [7, 7];
                     return [row * cellSize + centerOffset, col * cellSize + centerOffset];
                 }
-                if (position > PATH_LENGTH) {
-                    const finishIndex = position - PATH_LENGTH - 1;
+
+                // FIX 1: Changed from `position > PATH_LENGTH` to `position >= PATH_LENGTH`
+                // This correctly identifies all positions on the finish path (52 to 57).
+                if (position >= PATH_LENGTH) {
+                    // FIX 2: Changed from `... - 1` to just `...`
+                    // This correctly maps position 52 to index 0, 53 to 1, etc.
+                    const finishIndex = position - PATH_LENGTH;
                     const [row, col] = PATH_DATA.FINISH_PATH_COORDS[color][finishIndex];
                     return [row * cellSize + centerOffset, col * cellSize + centerOffset];
                 }
+
+                // This logic is for the main path (positions 0-51)
                 const pathIndex = (position + PATH_DATA.START_POSITIONS[color]) % PATH_LENGTH;
                 const [row, col] = PATH_DATA.PATH_COORDS[pathIndex];
                 return [row * cellSize + centerOffset, col * cellSize + centerOffset];
             }
+            // --- ### END OF FIX ### ---
             
             const getGlobalPathIndex = (pawn) => pawn.position === -1 ? -1 : (pawn.position + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
 
@@ -572,6 +584,7 @@
                 return Object.values(gameState.pawns).filter(pawn => {
                     if (pawn.color !== currentPlayer || pawn.isFinished) return false;
                     if (pawn.position === -1) return gameState.diceValue === 6;
+                    // Pawns can move up to and including the final spot
                     return pawn.position + gameState.diceValue <= PATH_LENGTH + FINISH_PATH_LENGTH;
                 }).map(pawn => pawn.id);
             }
@@ -581,7 +594,7 @@
                 const startPos = pawn.position;
                 const dice = gameState.diceValue;
 
-                if (startPos === -1) {
+                if (startPos === -1) { // Moving out of home
                     pawn.position = 0;
                     pawnEl.classList.add('hopping');
                     hopSound.currentTime=0; hopSound.play();
@@ -590,28 +603,33 @@
                     pawnEl.style.left = `${left}px`;
                     await sleep(300);
                     pawnEl.classList.remove('hopping');
-                } else {
+                } else { // Moving along the path
                     for (let i = 1; i <= dice; i++) {
-                        pawn.position = startPos + i;
-                        if (pawn.position > PATH_LENGTH + FINISH_PATH_LENGTH) {
-                            pawn.position = startPos;
-                            break;
+                        const newPos = startPos + i;
+                        // This check prevents overshooting moves from even being animated
+                        if (newPos > PATH_LENGTH + FINISH_PATH_LENGTH) {
+                            break; // Stop animating if the move is invalid
                         }
+                        pawn.position = newPos;
+
                         pawnEl.classList.add('hopping');
                         hopSound.currentTime=0; hopSound.play();
                         const [top, left] = getPawnCoords(pawn);
                         pawnEl.style.top = `${top}px`;
                         pawnEl.style.left = `${left}px`;
-                        await sleep(pawn.position > PATH_LENGTH ? 200 : 150);
+                        await sleep(pawn.position >= PATH_LENGTH ? 200 : 150);
                         pawnEl.classList.remove('hopping');
                         await sleep(50);
                     }
                 }
-                if (pawn.position === PATH_LENGTH + FINISH_PATH_LENGTH) pawn.isFinished = true;
+                // Check for finishing after the move is complete
+                if (pawn.position === PATH_LENGTH + FINISH_PATH_LENGTH) {
+                    pawn.isFinished = true;
+                }
             }
 
             function checkForCapture(movedPawn) {
-                if (movedPawn.isFinished || movedPawn.position < 0 || movedPawn.position > PATH_LENGTH) return false;
+                if (movedPawn.isFinished || movedPawn.position < 0 || movedPawn.position >= PATH_LENGTH) return false;
                 
                 const movedGlobalIndex = getGlobalPathIndex(movedPawn);
                 const isSafeSquare = Object.values(PATH_DATA.START_POSITIONS).includes(movedGlobalIndex);
@@ -640,6 +658,7 @@
                 gameState.switchPawn = pawn;
                 await promptForSwitch();
                 
+                // The switch was executed if switchPawn is now null
                 return gameState.switchPawn === null;
             }
             
@@ -680,7 +699,6 @@
                 });
             }
             
-            // --- FIXED SWITCH LOGIC ---
             async function executeSwitch(opponentPawnId) {
                 const myPawn = gameState.switchPawn;
                 if (!myPawn) return;
@@ -688,23 +706,18 @@
                 
                 switchModal.style.display = 'none';
 
-                // 1. Swap the underlying data first. This is the source of truth.
                 [myPawn.position, opponentPawn.position] = [opponentPawn.position, myPawn.position];
                 
-                // 2. Get the DOM elements.
                 const myPawnEl = document.getElementById(myPawn.id);
                 const opPawnEl = document.getElementById(opponentPawn.id);
 
-                // 3. Get their NEW target coordinates based on the now-swapped data.
                 const [newMyTop, newMyLeft] = getPawnCoords(myPawn);
                 const [newOpTop, newOpLeft] = getPawnCoords(opponentPawn);
 
-                // 4. Animate both to their new positions simultaneously.
                 [myPawnEl, opPawnEl].forEach(el => el.classList.add('hopping'));
                 hopSound.currentTime = 0; 
                 hopSound.play();
                 
-                // A short delay for the "hop up" animation to start before the pawns move.
                 await sleep(100); 
 
                 myPawnEl.style.top = `${newMyTop}px`;
@@ -712,17 +725,13 @@
                 opPawnEl.style.top = `${newOpTop}px`;
                 opPawnEl.style.left = `${newOpLeft}px`;
 
-                // Wait for the CSS transition to complete.
                 await sleep(400); 
                 [myPawnEl, opPawnEl].forEach(el => el.classList.remove('hopping'));
                 
-                // 5. Clean up state and check for consequences of the move.
                 gameState.switchPawn = null;
                 
-                // Check if the player's pawn captured another piece at its new location.
                 checkForCapture(myPawn);
                 
-                // A brief final pause to let the user see the result.
                 await sleep(500);
             }
             
@@ -832,18 +841,21 @@
                     const newPos = (currentPos === -1) ? 0 : currentPos + dice;
                     let score = 0;
 
-                    score += newPos;
-                    if (newPos === PATH_LENGTH + FINISH_PATH_LENGTH) score += 1000;
-                    if (currentPos === -1) score += 50;
+                    score += newPos * 2; // Prioritize moving forward
+                    if (newPos === PATH_LENGTH + FINISH_PATH_LENGTH) score += 1000; // Winning move
+                    if (currentPos === -1 && dice === 6) score += 50; // Get a pawn out
                     
-                    const newGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
-                    const isSafe = Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex);
-                    
-                    if (!isSafe && newPos < PATH_LENGTH) {
-                        const opponentOnSquare = Object.values(gameState.pawns).some(op => op.color !== pawn.color && op.position !== -1 && getGlobalPathIndex(op) === newGlobalIndex);
-                        if (opponentOnSquare) score += 75;
+                    if (newPos < PATH_LENGTH) {
+                        const newGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
+                        const isSafe = Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex);
+                        
+                        if (!isSafe) {
+                            const opponentOnSquare = Object.values(gameState.pawns).some(op => op.color !== pawn.color && op.position !== -1 && getGlobalPathIndex(op) === newGlobalIndex);
+                            if (opponentOnSquare) score += 75; // Capture move
+                        } else {
+                             score += 20; // Landing on a safe square is good
+                        }
                     }
-                    if (isSafe) score += 40;
 
                     if(score > bestMove.score) {
                         bestMove = { pawnId, score };
