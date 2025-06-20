@@ -172,6 +172,7 @@
             text-align: center;
             backdrop-filter: blur(5px);
             z-index: 15;
+            padding: 10px; /* Add some padding for content on small screens */
         }
 
         .title {
@@ -326,6 +327,95 @@
             0% { opacity: 1; transform: translateY(0) scale(1); }
             50% { opacity: 0.8; transform: translateY(-15px) scale(1.1); }
             100% { opacity: 0; transform: translateY(-30px) scale(0.8); }
+        }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 768px) {
+            .score { font-size: 20px; top: 15px; left: 15px; }
+            .high-score { font-size: 16px; top: 15px; }
+            .health { font-size: 18px; top: 15px; right: 15px; }
+
+            .level-display { font-size: 16px; top: 50px; left: 15px; }
+            .multiplier-display { font-size: 16px; top: 50px; right: 15px; }
+
+            .ability-display { font-size: 14px; bottom: 50px; left: 15px; }
+            
+            .control-btn { /* Pause Button */
+                font-size: 16px;
+                padding: 8px 12px;
+                bottom: 80px; /* Adjusted to be above ability display */
+                left: 15px;
+                min-width: 40px;
+            }
+
+            .audio-controls { bottom: 15px; right: 15px; }
+            .audio-btn {
+                font-size: 13px;
+                padding: 8px 10px;
+                margin-left: 5px;
+            }
+
+            .pause-text { font-size: 36px; }
+
+            .start-screen .title, .game-over-screen .title { font-size: 36px; margin-bottom: 15px; }
+            .start-screen .subtitle, .game-over-screen .subtitle { font-size: 15px; margin-bottom: 15px; }
+            .final-score-text { font-size: 18px; margin-bottom: 15px; }
+            .start-screen .high-score-display { font-size: 16px; margin-bottom: 15px; }
+            
+            .btn { /* Start/Restart Game Button */
+                padding: 12px 25px;
+                font-size: 16px;
+            }
+            .instructions { font-size: 12px; margin-top: 15px; max-width: 95%; }
+            .stats { font-size: 14px; margin-top: 15px;}
+            .stats div { margin-bottom: 4px; }
+
+            .level-up { font-size: 30px; }
+            .near-miss-indicator { font-size: 12px; }
+        }
+
+        @media (max-width: 480px) {
+            .score { font-size: 16px; top: 10px; left: 10px; }
+            /* For very narrow screens, High Score text might get cramped. Consider abbreviating "High Score" in JS if this becomes an issue. */
+            .high-score { font-size: 13px; top: 10px; } 
+            .health { font-size: 14px; top: 10px; right: 10px; }
+
+            .level-display { font-size: 13px; top: 40px; left: 10px; }
+            .multiplier-display { font-size: 13px; top: 40px; right: 10px; }
+
+            .ability-display { font-size: 12px; bottom: 45px; left: 10px; }
+            
+            .control-btn { /* Pause Button */
+                font-size: 14px;
+                padding: 7px 10px;
+                bottom: 70px; /* Further adjusted */
+                left: 10px;
+                min-width: 35px;
+            }
+
+            .audio-controls { bottom: 10px; right: 10px; }
+            .audio-btn {
+                font-size: 11px;
+                padding: 6px 8px;
+                margin-left: 4px;
+            }
+
+            .pause-text { font-size: 28px; }
+
+            .start-screen .title, .game-over-screen .title { font-size: 30px; margin-bottom: 10px; }
+            .start-screen .subtitle, .game-over-screen .subtitle { font-size: 12px; margin-bottom: 10px; }
+            .final-score-text { font-size: 15px; margin-bottom: 10px; }
+            .start-screen .high-score-display { font-size: 13px; margin-bottom: 10px; }
+            
+            .btn { /* Start/Restart Game Button */
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            .instructions { font-size: 10px; margin-top: 10px; line-height: 1.4; max-width: 95%;}
+            .stats { font-size: 11px; margin-top: 10px; }
+            .stats div { margin-bottom: 3px; }
+
+            .level-up { font-size: 24px; }
         }
 
     </style>
