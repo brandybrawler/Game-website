@@ -700,22 +700,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderDice(value) {
+    async function renderDice(value, isRolling = false) {
         const diceFaces = {
-            1: 'transform: rotateY(0deg) translateZ(40px);',
-            2: 'transform: rotateY(-90deg) translateZ(40px);',
-            3: 'transform: rotateY(90deg) translateZ(40px);',
-            4: 'transform: rotateX(-90deg) translateZ(40px);',
-            5: 'transform: rotateX(90deg) translateZ(40px);',
-            6: 'transform: rotateY(180deg) translateZ(40px);'
+            1: 'rotateY(0deg)',
+            2: 'rotateY(-90deg)',
+            3: 'rotateY(90deg)',
+            4: 'rotateX(-90deg)',
+            5: 'rotateX(90deg)',
+            6: 'rotateY(180deg)'
         };
-        const randomSpins = `rotateX(${Math.floor(Math.random()*4)*90}deg) rotateY(${Math.floor(Math.random()*4)*90}deg)`;
-        
-        // If value is 0, it means spin, otherwise land on the face.
-        if (value === 0) {
-            diceEl.style.transform = `${randomSpins} ${diceFaces[1]}`;
+
+        let transformString = '';
+
+        if (isRolling) {
+            // Add multiple full rotations for a good spinning effect.
+            const randomSpinsX = 360 * (Math.floor(Math.random() * 2) + 3); // 3 or 4 full X spins
+            const randomSpinsY = 360 * (Math.floor(Math.random() * 2) + 3); // 3 or 4 full Y spins
+            transformString = `rotateX(${randomSpinsX}deg) rotateY(${randomSpinsY}deg) ${diceFaces[value]}`;
         } else {
-            diceEl.style.transform = `${diceEl.style.transform.replace(/transform:.*?;/, '')} ${diceFaces[value]}`;
+            // Just set to the face without spinning (for initialization)
+            transformString = diceFaces[value];
+        }
+
+        diceEl.style.transform = `${transformString} translateZ(40px)`;
+        
+        if (isRolling) {
+            // Wait for the 1s CSS transition to complete
+            await sleep(1000); 
         }
     }
     
@@ -773,7 +784,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameState.diceValue !== 6 && !hasPawnsOnBoard) {
             playerState.threeRollAttempt++;
             if (playerState.threeRollAttempt < 3) {
-                addToLog(`${currentPlayer.toUpperCase()} needs a 6. Attempt ${playerState.threeRollAttempt}/3.`);
+                addToLog(`${currentPlayer.toUpperCase()} needs a 6. Attempt ${playerState.threeRollAttempt} of 3.`);
                 updateStatus(`Roll a 6! (Attempt ${playerState.threeRollAttempt} of 3)`);
                 gameState.diceRolled = false;
                 gameState.isAnimating = false;
@@ -798,7 +809,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return movablePawns;
         } else {
-             // No moves possible. Check if it's an extra turn.
             if (gameState.diceValue === 6 || playerState.hasExtraRoll) {
                 addToLog(`${currentPlayer.toUpperCase()} has no moves, but gets to roll again.`);
                 updateStatus("No moves. Roll again!");
@@ -855,7 +865,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 addToLog(`${pawn.color.toUpperCase()} rolled a 6 and gets another turn.`);
                 updateStatus("Rolled a 6! Roll again.");
             }
-            // hasExtraRoll state is handled by the special square function
             if (gameState.playerTypes[pawn.color] === 'human') {
                 diceEl.classList.add('active');
             } else {
@@ -867,12 +876,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function rollDice() {
         gameState.diceRolled = true;
         gameState.isAnimating = true;
-        renderDice(0); // Spin
-        await sleep(1000);
+
         gameState.diceValue = Math.floor(Math.random() * 6) + 1;
-        renderDice(gameState.diceValue);
+        await renderDice(gameState.diceValue, true);
+        
         updateStatus();
-        await sleep(500);
+        gameState.isAnimating = false;
     }
     
     function findMovablePawns() {
@@ -1106,12 +1115,11 @@ document.addEventListener('DOMContentLoaded', () => {
         [myPawnEl, opPawnEl].forEach(el => el.classList.remove('hopping'));
         addToLog(`${myPawn.color.toUpperCase()} switched with ${opponentPawn.color.toUpperCase()}.`);
         
-        // Update stacks at all 4 affected positions (my old, my new, op's old, op's new)
         await updateStacks(myPawn, myOriginalPos);
         await updateStacks(opponentPawn, opOriginalPos);
         
-        checkForCapture(myPawn); // Check if the switch resulted in a capture for me
-        checkForCapture(opponentPawn); // or for the opponent
+        checkForCapture(myPawn);
+        checkForCapture(opponentPawn);
     }
 
     function checkForWin() {
@@ -1189,9 +1197,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (message) {
              statusEl.innerHTML = message;
         } else {
-            const turnText = playerType === 'ai' 
+            let turnText = playerType === 'ai' 
                 ? `<strong style="color:${playerInfo.color}">${currentPlayer.toUpperCase()} (AI)</strong>'s turn.`
                 : `It's <strong style="color:${playerInfo.color}">${currentPlayer.toUpperCase()}</strong>'s turn. Roll the dice!`;
+            if (gameState.diceValue) {
+                turnText = `<strong style="color:${playerInfo.color}">${currentPlayer.toUpperCase()}</strong> rolled a ${gameState.diceValue}!`;
+            }
             statusEl.innerHTML = turnText;
         }
         
@@ -1265,12 +1276,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function aiFindBestSwitchTarget(myPawn, opponents) {
-        let bestSwitch = { target: null, score: 0 }; // Score 0 means no benefit
+        let bestSwitch = { target: null, score: 0 }; 
         const myCurrentPos = myPawn.position;
 
         for(const opponentPawn of opponents) {
             const opponentPos = opponentPawn.position;
-            // Simple score: Net gain in position. More advanced scoring could be added.
             const score = opponentPos - myCurrentPos;
             if (score > bestSwitch.score) {
                 bestSwitch = { target: opponentPawn, score };
@@ -1291,56 +1301,45 @@ document.addEventListener('DOMContentLoaded', () => {
             const newPos = (pawn.position === -1) ? 0 : pawn.position + dice;
             if (newPos > TOTAL_PATH_LENGTH) continue;
 
-            // BASE SCORE: Progress is good
             score += newPos;
             if (newPos > pawn.position) score += dice;
-
-            // HUGE INCENTIVE: Finishing a pawn
             if (newPos === TOTAL_PATH_LENGTH) score += 1000;
-            
-            // INCENTIVE: Getting out of home
             if (pawn.position === -1) score += 50;
             
             if (newPos < PATH_LENGTH) {
                 const newGlobalIndex = getGlobalPathIndex({ ...pawn, position: newPos });
-                
-                // INCENTIVE: Landing on a safe square
                 if (Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex)) score += 20;
 
-                // INCENTIVE: Capturing
                 const opponentsOnSquare = Object.values(gameState.pawns).filter(op => op.color !== pawn.color && op.position !== -1 && getGlobalPathIndex(op) === newGlobalIndex);
                 if (opponentsOnSquare.length > 0 && pawn.stackSize >= opponentsOnSquare[0].stackSize) {
-                    score += 75 * opponentsOnSquare.length; // More points for capturing a stack
+                    score += 75 * opponentsOnSquare.length; 
                 }
                 
-                // INCENTIVE: Stacking / Creating a blockade
                 const alliesOnSquare = Object.values(gameState.pawns).filter(p => p.id !== pawn.id && p.color === pawn.color && getGlobalPathIndex(p) === newGlobalIndex);
                 if (alliesOnSquare.length > 0) {
-                    score += 60; // Big bonus for creating a blockade
+                    score += 60;
                 }
 
-                // EVALUATE DANGER: Check if the new spot is dangerous
                 for (const otherPawn of Object.values(gameState.pawns)) {
                     if (otherPawn.color === pawn.color || otherPawn.position === -1) continue;
                     for (let d = 1; d <= 6; d++) {
                         const opponentTargetPos = (otherPawn.position + d + PATH_DATA.START_POSITIONS[otherPawn.color]) % PATH_LENGTH;
                         if (opponentTargetPos === newGlobalIndex) {
-                            score -= 30; // It's a dangerous spot
+                            score -= 30;
                             break;
                         }
                     }
                 }
 
-                // EVALUATE SPECIAL SQUARES
                 const specialType = gameState.specialSquares[newGlobalIndex];
                 if(specialType === 'boost') score += 25;
                 if(specialType === 'roll_again') score += 40;
-                if(specialType === 'trap') score -= 100; // Avoid traps!
+                if(specialType === 'trap') score -= 100;
                 if(specialType === 'switch') {
                     const potentialOpponents = Object.values(gameState.pawns).filter(p => p.color !== pawn.color && gameState.activePlayers.includes(p.color) && p.position !== -1 && !p.isFinished);
                     const bestTarget = aiFindBestSwitchTarget(pawn, potentialOpponents);
                     if(bestTarget) {
-                        score += bestTarget.position - pawn.position; // Add net gain to score
+                        score += (bestTarget.position - newPos);
                     }
                 }
             }
