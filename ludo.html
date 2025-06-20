@@ -6,7 +6,8 @@
     <title>Ludo - Bunny Hop Edition</title>
     <style>
         :root {
-            --board-size: clamp(450px, 90vmin, 700px);
+            /* Responsive board size: min 320px, preferred 90% of viewport, max 700px */
+            --board-size: clamp(320px, 90vmin, 700px);
             --cell-size: calc(var(--board-size) / 15);
             --pawn-size: calc(var(--cell-size) * 0.7);
             --hop-duration: 0.2s;
@@ -39,6 +40,8 @@
 
         #game-container {
             display: flex;
+            /* Default to side-by-side layout for larger screens */
+            flex-direction: row;
             flex-wrap: wrap;
             justify-content: center;
             gap: 30px;
@@ -149,8 +152,8 @@
             margin: auto;
             padding: 30px;
             border: 1px solid rgba(255, 255, 255, 0.2); 
-            width: 80%;
-            max-width: 500px;
+            width: 90%; /* Use percentage for small screens */
+            max-width: 500px; /* Cap width on large screens */
             border-radius: 15px;
             text-align: center;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4); 
@@ -165,16 +168,8 @@
         .switch-pawn.blue { background: radial-gradient(circle at 30% 30%, #48dbfb, #0984e3); }
         .switch-pawn:hover { border-color: #fff; transform: scale(1.1); }
         
-        /* --- MENU IMPROVEMENTS --- */
-        #main-menu {
-            display: flex; 
-        }
-        #main-menu .modal-content {
-            max-width: 600px;
-        }
-        .menu-section {
-            margin-bottom: 25px;
-        }
+        #main-menu { display: flex; }
+        .menu-section { margin-bottom: 25px; }
         .menu-section h3 {
             margin-bottom: 15px;
             color: #bdc3c7; 
@@ -207,15 +202,9 @@
              color: #3498db;
              font-weight: bold;
         }
-        .player-count-selector label:hover {
-            background-color: rgba(255,255,255,0.05);
-        }
+        .player-count-selector label:hover { background-color: rgba(255,255,255,0.05); }
 
-        .player-color-selectors {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
+        .player-color-selectors { display: flex; flex-direction: column; gap: 15px; }
         .player-selector {
             display: flex;
             justify-content: space-between;
@@ -237,55 +226,29 @@
             border-width: 0;
         }
 
-        .player-selector span {
-            font-weight: bold;
-            color: #fff;
-        }
-        .color-options {
-            display: flex;
-            gap: 10px;
-        }
+        .player-selector span { font-weight: bold; color: #fff; }
+        .color-options { display: flex; gap: 10px; }
         .color-choice {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 4px solid transparent;
+            width: 40px; height: 40px; border-radius: 50%;
+            cursor: pointer; border: 4px solid transparent;
             transition: all 0.2s;
         }
         .color-choice.red { background-color: var(--red-color); }
         .color-choice.green { background-color: var(--green-color); }
         .color-choice.yellow { background-color: var(--yellow-color); }
         .color-choice.blue { background-color: var(--blue-color); }
-        .color-choice:hover {
-            transform: scale(1.1);
-        }
-        .color-choice.selected {
-            border-color: #3498db;
-            box-shadow: 0 0 10px #3498db;
-        }
-        .color-choice.taken {
-            cursor: not-allowed;
-            opacity: 0.3;
-            transform: scale(0.9);
-        }
+        .color-choice:hover { transform: scale(1.1); }
+        .color-choice.selected { border-color: #3498db; box-shadow: 0 0 10px #3498db; }
+        .color-choice.taken { cursor: not-allowed; opacity: 0.3; transform: scale(0.9); }
+        
         #start-game-btn {
-            padding: 12px 30px;
-            font-size: 1.2em;
-            background-color: #27ae60;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
+            padding: 12px 30px; font-size: 1.2em;
+            background-color: #27ae60; color: white;
+            border: none; border-radius: 8px;
+            cursor: pointer; transition: background-color 0.3s;
         }
-        #start-game-btn:disabled {
-            background-color: #95a5a6;
-            cursor: not-allowed;
-        }
-        #start-game-btn:not(:disabled):hover {
-            background-color: #2ecc71;
-        }
+        #start-game-btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        #start-game-btn:not(:disabled):hover { background-color: #2ecc71; }
 
         @keyframes pulse-glow {
             0%, 100% { transform: scale(1); box-shadow: 0 4px 8px rgba(0,0,0,0.5), 0 0 0 0px var(--current-player-color-glow); }
@@ -296,6 +259,24 @@
             0%, 100% { transform: scale(1) rotate(0deg); }
             25% { transform: scale(1.05) rotate(-5deg); }
             75% { transform: scale(1.05) rotate(5deg); }
+        }
+
+        /* --- RESPONSIVE DESIGN MEDIA QUERY --- */
+        @media (max-width: 800px) {
+            body {
+                padding: 10px; /* Less padding on small screens */
+            }
+            #game-container {
+                flex-direction: column; /* Stack board and info panel vertically */
+                gap: 20px;
+            }
+            #game-info {
+                width: var(--board-size); /* Make info panel match board width */
+                max-width: 100%;
+            }
+            #game-info h1 {
+                font-size: 1.5em; /* Smaller title on mobile */
+            }
         }
     </style>
 </head>
@@ -314,33 +295,7 @@
             </div>
             <div class="menu-section">
                 <h3>Choose your colors:</h3>
-                <div id="player-color-selectors" class="player-color-selectors">
-                    <!-- All four selectors are now in the HTML, visibility is controlled by JS/CSS -->
-                    <div id="player-1-selector" class="player-selector">
-                        <span>Player 1:</span>
-                        <div class="color-options" data-player-id="player1">
-                            ${PLAYER_ORDER.map(color => `<div class="color-choice ${color}" data-color="${color}"></div>`).join('')}
-                        </div>
-                    </div>
-                    <div id="player-2-selector" class="player-selector hidden">
-                        <span>Player 2:</span>
-                        <div class="color-options" data-player-id="player2">
-                            ${PLAYER_ORDER.map(color => `<div class="color-choice ${color}" data-color="${color}"></div>`).join('')}
-                        </div>
-                    </div>
-                    <div id="player-3-selector" class="player-selector hidden">
-                        <span>Player 3:</span>
-                        <div class="color-options" data-player-id="player3">
-                            ${PLAYER_ORDER.map(color => `<div class="color-choice ${color}" data-color="${color}"></div>`).join('')}
-                        </div>
-                    </div>
-                    <div id="player-4-selector" class="player-selector hidden">
-                        <span>Player 4:</span>
-                        <div class="color-options" data-player-id="player4">
-                            ${PLAYER_ORDER.map(color => `<div class="color-choice ${color}" data-color="${color}"></div>`).join('')}
-                        </div>
-                    </div>
-                </div>
+                <div id="player-color-selectors" class="player-color-selectors"></div>
             </div>
             <button id="start-game-btn" disabled>Start Game</button>
         </div>
@@ -380,6 +335,7 @@
             // --- Menu Elements ---
             const mainMenu = document.getElementById('main-menu');
             const playerCountSelector = document.querySelector('.player-count-selector');
+            const playerColorSelectorsContainer = document.getElementById('player-color-selectors');
             const startGameBtn = document.getElementById('start-game-btn');
 
             // --- Game Constants ---
@@ -406,14 +362,14 @@
             let menuState = { numPlayers: 1, playerSelections: {} };
             const sleep = ms => new Promise(res => setTimeout(res, ms));
 
-            // --- Menu Logic (Improved) ---
+            // --- Menu Logic ---
             function setupMenu() {
                 mainMenu.style.display = 'flex';
                 gameContainer.style.display = 'none';
 
-                // Event listeners only need to be added once since HTML is static
+                createColorSelectors(); // Dynamically create selectors
                 addColorChoiceListeners();
-                updatePlayerSelectorVisibility(menuState.numPlayers); // Show initial state (1 player)
+                updatePlayerSelectorVisibility(menuState.numPlayers);
                 checkStartButtonState();
 
                 playerCountSelector.addEventListener('change', (e) => {
@@ -436,8 +392,20 @@
                 });
             }
 
+            function createColorSelectors() {
+                playerColorSelectorsContainer.innerHTML = '';
+                 for (let i = 1; i <= 4; i++) {
+                    playerColorSelectorsContainer.innerHTML += `
+                        <div id="player-${i}-selector" class="player-selector hidden">
+                            <span>Player ${i}:</span>
+                            <div class="color-options" data-player-id="player${i}">
+                                ${PLAYER_ORDER.map(c => `<div class="color-choice ${c}" data-color="${c}"></div>`).join('')}
+                            </div>
+                        </div>`;
+                }
+            }
+
             function updatePlayerSelectorVisibility(num) {
-                // First, remove selections for players that are no longer active
                 for (const playerId in menuState.playerSelections) {
                     const playerNum = parseInt(playerId.replace('player', ''));
                     if (playerNum > num) {
@@ -445,7 +413,6 @@
                     }
                 }
 
-                // Toggle visibility of the selectors
                 for (let i = 1; i <= 4; i++) {
                     const selector = document.getElementById(`player-${i}-selector`);
                     if (i <= num) {
@@ -462,18 +429,14 @@
                         const color = e.target.dataset.color;
                         const playerId = e.target.parentElement.dataset.playerId;
 
-                        // Prevent taking a color that is already selected by another player
                         if (Object.values(menuState.playerSelections).includes(color) && menuState.playerSelections[playerId] !== color) {
                             return;
                         }
-
-                        // Toggle selection for the current player
                         if (menuState.playerSelections[playerId] === color) {
                             delete menuState.playerSelections[playerId];
                         } else {
                             menuState.playerSelections[playerId] = color;
                         }
-
                         updateSelectedColorsUI();
                         checkStartButtonState();
                     });
@@ -497,7 +460,6 @@
             }
             
             function checkStartButtonState() {
-                // The game is ready to start if the number of selected colors matches the number of players
                 startGameBtn.disabled = Object.keys(menuState.playerSelections).length !== menuState.numPlayers;
             }
 
@@ -944,28 +906,6 @@
             }
 
             // --- Initializer ---
-            // Note: The player selector HTML is now hard-coded, but the color choices
-            // inside are generated dynamically here to avoid repetition. This is a bit of
-            // a hybrid approach but keeps the main HTML cleaner.
-            const playerSelectorsContainer = document.getElementById('player-color-selectors');
-            playerSelectorsContainer.innerHTML = `
-                <div id="player-1-selector" class="player-selector">
-                    <span>Player 1:</span>
-                    <div class="color-options" data-player-id="player1">${PLAYER_ORDER.map(c => `<div class="color-choice ${c}" data-color="${c}"></div>`).join('')}</div>
-                </div>
-                <div id="player-2-selector" class="player-selector">
-                    <span>Player 2:</span>
-                    <div class="color-options" data-player-id="player2">${PLAYER_ORDER.map(c => `<div class="color-choice ${c}" data-color="${c}"></div>`).join('')}</div>
-                </div>
-                <div id="player-3-selector" class="player-selector">
-                    <span>Player 3:</span>
-                    <div class="color-options" data-player-id="player3">${PLAYER_ORDER.map(c => `<div class="color-choice ${c}" data-color="${c}"></div>`).join('')}</div>
-                </div>
-                <div id="player-4-selector" class="player-selector">
-                    <span>Player 4:</span>
-                    <div class="color-options" data-player-id="player4">${PLAYER_ORDER.map(c => `<div class="color-choice ${c}" data-color="${c}"></div>`).join('')}</div>
-                </div>`;
-
             setupMenu();
         });
     </script>
