@@ -578,8 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
             switchPlayer();
         }
     }
-    
-    // --- Menu Helper Functions (similar to original, no major changes)
+
     function createColorSelectors() {playerColorSelectorsContainer.innerHTML = '';for (let i = 1; i <= 4; i++) {playerColorSelectorsContainer.innerHTML += `<div id="player-${i}-selector" class="player-selector hidden"><span>Player ${i}:</span><div class="color-options" data-player-id="player${i}">${PLAYER_ORDER.map(c => `<div class="color-choice ${c}" data-color="${c}"></div>`).join('')}</div></div>`;}}
     function updatePlayerSelectorVisibility(num) {for (const playerId in menuState.playerSelections) {const playerNum = parseInt(playerId.replace('player', ''));if (playerNum > num) {delete menuState.playerSelections[playerId];}}for (let i = 1; i <= 4; i++) {const selector = document.getElementById(`player-${i}-selector`);if (i <= num) {selector.classList.remove('hidden');} else {selector.classList.add('hidden');}}}
     function addColorChoiceListeners() {document.querySelectorAll('.color-choice').forEach(choice => {choice.addEventListener('click', (e) => {const color = e.target.dataset.color;const playerId = e.target.parentElement.dataset.playerId;if (Object.values(menuState.playerSelections).includes(color) && menuState.playerSelections[playerId] !== color) {return;}if (menuState.playerSelections[playerId] === color) {delete menuState.playerSelections[playerId];} else {menuState.playerSelections[playerId] = color;}updateSelectedColorsUI();checkStartButtonState();});});}
@@ -589,6 +588,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Game Initialization ---
     function initGame(playerTypes, numPlayers) {
         createBoardVisuals();
+        createDiceVisuals();
+
         gameState = {
             playerTypes,
             numPlayers,
@@ -607,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         gameState.activePlayers.forEach(color => {
-            gameState.playersState[color] = { isTrapped: false, threeRollAttempt: 0 };
+            gameState.playersState[color] = { isTrapped: false, threeRollAttempt: 0, hasExtraRoll: false };
             for (let i = 0; i < 4; i++) {
                 const pawnId = `${color}-pawn-${i}`;
                 gameState.pawns[pawnId] = { id: pawnId, color: color, position: -1, isFinished: false, stackSize: 1 };
@@ -616,7 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         placeSpecialSquares();
         renderAllPawns();
-        renderDice(0);
+        renderDice(1);
         addToLog('Game started. Good luck!');
         diceEl.addEventListener('click', handleHumanRoll);
         switchPlayer();
@@ -689,28 +690,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    function createDiceVisuals() {
+        diceEl.innerHTML = '';
+        for (let i = 1; i <= 6; i++) {
+            const face = document.createElement('div');
+            face.className = `dice-face face-${i}`;
+            for (let j = 0; j < i; j++) face.innerHTML += '<div class="dice-pip"></div>';
+            diceEl.appendChild(face);
+        }
+    }
+
     function renderDice(value) {
         const diceFaces = {
-            0: 'transform: rotateY(0deg);',
-            1: 'transform: rotateY(0deg);',
-            2: 'transform: rotateY(-90deg);',
-            3: 'transform: rotateY(90deg);',
-            4: 'transform: rotateX(-90deg);',
-            5: 'transform: rotateX(90deg);',
-            6: 'transform: rotateY(180deg);'
+            1: 'transform: rotateY(0deg) translateZ(40px);',
+            2: 'transform: rotateY(-90deg) translateZ(40px);',
+            3: 'transform: rotateY(90deg) translateZ(40px);',
+            4: 'transform: rotateX(-90deg) translateZ(40px);',
+            5: 'transform: rotateX(90deg) translateZ(40px);',
+            6: 'transform: rotateY(180deg) translateZ(40px);'
         };
         const randomSpins = `rotateX(${Math.floor(Math.random()*4)*90}deg) rotateY(${Math.floor(Math.random()*4)*90}deg)`;
-        diceEl.style.transform = `${randomSpins} ${diceFaces[value] || diceFaces[0]}`;
         
-        if (value === 0) { // Initial state
-             if(diceEl.children.length === 0) {
-                 for(let i=1; i<=6; i++) {
-                    const face = document.createElement('div');
-                    face.className = `dice-face face-${i}`;
-                    for(let j=0; j<i; j++) face.innerHTML += '<div class="dice-pip"></div>';
-                    diceEl.appendChild(face);
-                 }
-            }
+        // If value is 0, it means spin, otherwise land on the face.
+        if (value === 0) {
+            diceEl.style.transform = `${randomSpins} ${diceFaces[1]}`;
+        } else {
+            diceEl.style.transform = `${diceEl.style.transform.replace(/transform:.*?;/, '')} ${diceFaces[value]}`;
         }
     }
     
@@ -735,16 +740,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const pawn = gameState.pawns[pawnId];
         const newPos = pawn.position === -1 ? 0 : pawn.position + gameState.diceValue;
-        const targetGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
+        
         let targetCell;
 
         if (newPos >= TOTAL_PATH_LENGTH) {
-            // Can't highlight finish square, do nothing
+            // Can't highlight finish square, do nothing for now
         } else if (newPos >= PATH_LENGTH) {
             const finishIndex = newPos - PATH_LENGTH;
             const [r, c] = PATH_DATA.FINISH_PATH_COORDS[pawn.color][finishIndex];
             targetCell = board.querySelector(`[data-row="${r}"][data-col="${c}"]`);
         } else {
+             const targetGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
              const [r, c] = PATH_DATA.PATH_COORDS[targetGlobalIndex];
              targetCell = board.querySelector(`[data-row="${r}"][data-col="${c}"]`);
         }
@@ -768,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
             playerState.threeRollAttempt++;
             if (playerState.threeRollAttempt < 3) {
                 addToLog(`${currentPlayer.toUpperCase()} needs a 6. Attempt ${playerState.threeRollAttempt}/3.`);
-                updateStatus(`Roll a 6! (Attempt ${playerState.threeRollAttempt + 1})`);
+                updateStatus(`Roll a 6! (Attempt ${playerState.threeRollAttempt} of 3)`);
                 gameState.diceRolled = false;
                 gameState.isAnimating = false;
                 if (!isAI) diceEl.classList.add('active');
@@ -792,15 +798,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return movablePawns;
         } else {
-            updateStatus("No possible moves.");
-            addToLog(`${currentPlayer.toUpperCase()} has no available moves.`);
-            if(!isAI) {
-                passTurnBtn.style.display = 'block';
+             // No moves possible. Check if it's an extra turn.
+            if (gameState.diceValue === 6 || playerState.hasExtraRoll) {
+                addToLog(`${currentPlayer.toUpperCase()} has no moves, but gets to roll again.`);
+                updateStatus("No moves. Roll again!");
+                playerState.hasExtraRoll = false; // Consume the special roll
+                gameState.diceRolled = false;
+                gameState.isAnimating = false;
+                if (!isAI) {
+                    diceEl.classList.add('active');
+                } else {
+                    setTimeout(executeAITurn, 1000);
+                }
             } else {
-                await sleep(1000);
-                switchPlayer();
+                updateStatus("No possible moves.");
+                addToLog(`${currentPlayer.toUpperCase()} has no available moves.`);
+                if(!isAI) {
+                    passTurnBtn.style.display = 'block';
+                } else {
+                    await sleep(1000);
+                    switchPlayer();
+                }
+                gameState.isAnimating = false;
             }
-            gameState.isAnimating = false;
             return null;
         }
     }
@@ -809,9 +829,11 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.isAnimating = true;
         
         const pawn = gameState.pawns[pawnId];
+        const originalPosition = pawn.position;
+
         await movePawnWithAnimation(pawn);
         
-        await updateStacks(pawn);
+        await updateStacks(pawn, originalPosition);
         checkForCapture(pawn);
         await sleep(200);
 
@@ -833,6 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addToLog(`${pawn.color.toUpperCase()} rolled a 6 and gets another turn.`);
                 updateStatus("Rolled a 6! Roll again.");
             }
+            // hasExtraRoll state is handled by the special square function
             if (gameState.playerTypes[pawn.color] === 'human') {
                 diceEl.classList.add('active');
             } else {
@@ -865,10 +888,19 @@ document.addEventListener('DOMContentLoaded', () => {
             // Check for blockades
             for (let i = pawn.position + 1; i < targetPos; i++) {
                 if (i >= PATH_LENGTH) break; // No blockades on finish path
-                const stepGlobalIndex = (i + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
+                const stepGlobalIndex = getGlobalPathIndex({ ...pawn, position: i });
                 
-                const pawnsOnStep = Object.values(gameState.pawns).filter(p => p.position !== -1 && getGlobalPathIndex(p) === stepGlobalIndex);
-                if (pawnsOnStep.length >= 2) return false; // Blockade found
+                const pawnsOnStep = Object.values(gameState.pawns).filter(p => p.position !== -1 && !p.isFinished && getGlobalPathIndex(p) === stepGlobalIndex);
+                if (pawnsOnStep.length < 2) continue;
+
+                const pawnsByColor = pawnsOnStep.reduce((acc, p) => {
+                    acc[p.color] = (acc[p.color] || 0) + 1;
+                    return acc;
+                }, {});
+
+                for (const color in pawnsByColor) {
+                    if(pawnsByColor[color] >= 2) return false; // Blockade found
+                }
             }
             return true;
         }).map(pawn => pawn.id);
@@ -909,32 +941,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- New & Updated Game Mechanics ---
 
-    async function updateStacks(movedPawn) {
-        // First, unstack from original location if it was in a stack
-        Object.values(gameState.pawns).forEach(p => {
-             if (p.id !== movedPawn.id && p.stackSize > 1) {
-                const pawnsOnSquare = Object.values(gameState.pawns).filter(other => p.color === other.color && !other.isFinished && other.position !== -1 && getPawnCoords(p).toString() === getPawnCoords(other).toString());
-                const newStackSize = pawnsOnSquare.length;
-                pawnsOnSquare.forEach(pawnToUpdate => updatePawnStackSize(pawnToUpdate.id, newStackSize));
-            }
-        });
+    async function updateStacks(movedPawn, previousPosition) {
+        // Unstack from original location if it was on the board
+        if (previousPosition !== -1) {
+            const previousGlobalIndex = getGlobalPathIndex({ ...movedPawn, position: previousPosition });
+            const pawnsOnOldSquare = Object.values(gameState.pawns).filter(p => p.color === movedPawn.color && !p.isFinished && p.position !== -1 && getGlobalPathIndex(p) === previousGlobalIndex);
+            pawnsOnOldSquare.forEach(pawnToUpdate => updatePawnStackSize(pawnToUpdate.id, pawnsOnOldSquare.length));
+        }
 
         // Now, check for new stack at destination
         if (movedPawn.isFinished || movedPawn.position === -1) {
             updatePawnStackSize(movedPawn.id, 1);
             return;
-        };
+        }
 
-        const pawnsOnSquare = Object.values(gameState.pawns).filter(p => p.color === movedPawn.color && !p.isFinished && getPawnCoords(p).toString() === getPawnCoords(movedPawn).toString());
-        const newStackSize = pawnsOnSquare.length;
-        pawnsOnSquare.forEach(pawnToUpdate => updatePawnStackSize(pawnToUpdate.id, newStackSize));
-        if (newStackSize > 1) addToLog(`${movedPawn.color.toUpperCase()} formed a stack of ${newStackSize}.`);
+        const currentGlobalIndex = getGlobalPathIndex(movedPawn);
+        const pawnsOnNewSquare = Object.values(gameState.pawns).filter(p => p.color === movedPawn.color && !p.isFinished && p.position !== -1 && getGlobalPathIndex(p) === currentGlobalIndex);
+        const newStackSize = pawnsOnNewSquare.length;
+        pawnsOnNewSquare.forEach(pawnToUpdate => updatePawnStackSize(pawnToUpdate.id, newStackSize));
+        
+        if (newStackSize > 1) {
+            addToLog(`${movedPawn.color.toUpperCase()} formed a stack of ${newStackSize}.`);
+        }
     }
 
     function updatePawnStackSize(pawnId, size) {
         const pawn = gameState.pawns[pawnId];
-        const pawnEl = document.getElementById(pawnId);
+        if (!pawn) return;
         pawn.stackSize = size;
+        const pawnEl = document.getElementById(pawnId);
+        if (!pawnEl) return;
+        
         if (size > 1) {
             pawnEl.dataset.stackSize = `x${size}`;
         } else {
@@ -958,11 +995,11 @@ document.addEventListener('DOMContentLoaded', () => {
             addToLog(`${movedPawn.color.toUpperCase()} captured ${opponentsOnSquare[0].color.toUpperCase()}'s stack!`);
             opponentsOnSquare.forEach(capturedPawn => {
                 capturedPawn.position = -1;
-                updatePawnStackSize(capturedPawn.id, 1);
                 const capturedPawnEl = document.getElementById(capturedPawn.id);
                 const [top, left] = getPawnCoords(capturedPawn);
                 capturedPawnEl.style.top = `${top}px`;
                 capturedPawnEl.style.left = `${left}px`;
+                updatePawnStackSize(capturedPawn.id, 1);
             });
         }
     }
@@ -985,8 +1022,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'boost':
                 addToLog(`${currentPlayer.toUpperCase()} hit a Boost! +${BOOST_AMOUNT} spaces.`);
                 await sleep(500);
+                const originalPosition = pawn.position;
                 await movePawnWithAnimation(pawn, BOOST_AMOUNT, true);
-                await updateStacks(pawn);
+                await updateStacks(pawn, originalPosition);
                 checkForCapture(pawn);
                 break;
             case 'trap':
@@ -996,6 +1034,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'roll_again':
                 addToLog(`${currentPlayer.toUpperCase()} gets another roll!`);
+                gameState.playersState[currentPlayer].hasExtraRoll = true;
                 result.rollAgain = true;
                 break;
         }
@@ -1011,16 +1050,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return new Promise(async (resolve) => {
             if (opponents.length === 0) {
-                updateStatus("No opponent pawns to switch with. Unlucky!");
+                addToLog("No opponent pawns to switch with. Unlucky!");
+                updateStatus("No opponents to switch with!");
                 await sleep(1500);
                 resolve();
                 return;
             }
 
             if (isAI) {
-                const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
+                const bestTarget = aiFindBestSwitchTarget(pawn, opponents);
                 await sleep(1000);
-                await executeSwitch(pawn.id, randomOpponent.id);
+                if (bestTarget) {
+                    await executeSwitch(pawn.id, bestTarget.id);
+                } else {
+                    addToLog("AI chose not to switch.");
+                }
                 resolve();
             } else {
                 switchOptionsEl.innerHTML = opponents.map(p => `<div class="switch-pawn ${p.color}" data-pawn-id="${p.id}"></div>`).join('');
@@ -1040,14 +1084,15 @@ document.addEventListener('DOMContentLoaded', () => {
         switchModal.style.display = 'none';
         const myPawn = gameState.pawns[myPawnId];
         const opponentPawn = gameState.pawns[opponentPawnId];
+        
+        const myOriginalPos = myPawn.position;
+        const opOriginalPos = opponentPawn.position;
 
-        [myPawn.position, opponentPawn.position] = [opponentPawn.position, myPawn.position];
-        [myPawn.stackSize, opponentPawn.stackSize] = [opponentPawn.stackSize, myPawn.stackSize];
-
-        await Promise.all([updateStacks(myPawn), updateStacks(opponentPawn)]);
+        [myPawn.position, opponentPawn.position] = [opOriginalPos, myOriginalPos];
         
         const myPawnEl = document.getElementById(myPawn.id);
         const opPawnEl = document.getElementById(opponentPawn.id);
+        
         [myPawnEl, opPawnEl].forEach(el => el.classList.add('hopping'));
         if(gameState.isSoundOn) hopSound.play();
         await sleep(100);
@@ -1061,8 +1106,12 @@ document.addEventListener('DOMContentLoaded', () => {
         [myPawnEl, opPawnEl].forEach(el => el.classList.remove('hopping'));
         addToLog(`${myPawn.color.toUpperCase()} switched with ${opponentPawn.color.toUpperCase()}.`);
         
-        checkForCapture(myPawn); // Check if the switch resulted in a capture
-        checkForCapture(opponentPawn);
+        // Update stacks at all 4 affected positions (my old, my new, op's old, op's new)
+        await updateStacks(myPawn, myOriginalPos);
+        await updateStacks(opponentPawn, opOriginalPos);
+        
+        checkForCapture(myPawn); // Check if the switch resulted in a capture for me
+        checkForCapture(opponentPawn); // or for the opponent
     }
 
     function checkForWin() {
@@ -1086,6 +1135,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function switchPlayer() {
         clearHighlights();
         passTurnBtn.style.display = 'none';
+        
+        const prevPlayer = gameState.activePlayers[gameState.currentPlayerIndex];
+        if (prevPlayer) gameState.playersState[prevPlayer].hasExtraRoll = false;
+
         gameState.isAnimating = false;
         gameState.diceRolled = false;
         gameState.diceValue = null;
@@ -1204,13 +1257,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const movablePawns = await rollDiceAndFindMoves(true);
 
-        if (movablePawns) {
+        if (movablePawns && movablePawns.length > 0) {
             await sleep(500);
             const bestPawnId = aiChooseBestMove(movablePawns);
             await executeMove(bestPawnId);
         }
     }
-        
+    
+    function aiFindBestSwitchTarget(myPawn, opponents) {
+        let bestSwitch = { target: null, score: 0 }; // Score 0 means no benefit
+        const myCurrentPos = myPawn.position;
+
+        for(const opponentPawn of opponents) {
+            const opponentPos = opponentPawn.position;
+            // Simple score: Net gain in position. More advanced scoring could be added.
+            const score = opponentPos - myCurrentPos;
+            if (score > bestSwitch.score) {
+                bestSwitch = { target: opponentPawn, score };
+            }
+        }
+        return bestSwitch.target;
+    }
+
     function aiChooseBestMove(movablePawns) {
         let bestMove = { pawnId: null, score: -Infinity };
         const currentPlayer = gameState.activePlayers[gameState.currentPlayerIndex];
@@ -1221,10 +1289,11 @@ document.addEventListener('DOMContentLoaded', () => {
             let score = 0;
             
             const newPos = (pawn.position === -1) ? 0 : pawn.position + dice;
-            if (newPos > TOTAL_PATH_LENGTH) continue; // Should be filtered by findMovablePawns, but safety first.
+            if (newPos > TOTAL_PATH_LENGTH) continue;
 
             // BASE SCORE: Progress is good
             score += newPos;
+            if (newPos > pawn.position) score += dice;
 
             // HUGE INCENTIVE: Finishing a pawn
             if (newPos === TOTAL_PATH_LENGTH) score += 1000;
@@ -1233,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (pawn.position === -1) score += 50;
             
             if (newPos < PATH_LENGTH) {
-                const newGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
+                const newGlobalIndex = getGlobalPathIndex({ ...pawn, position: newPos });
                 
                 // INCENTIVE: Landing on a safe square
                 if (Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex)) score += 20;
@@ -1267,7 +1336,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(specialType === 'boost') score += 25;
                 if(specialType === 'roll_again') score += 40;
                 if(specialType === 'trap') score -= 100; // Avoid traps!
-                if(specialType === 'switch') score += 5; // Slightly positive, could be good or bad
+                if(specialType === 'switch') {
+                    const potentialOpponents = Object.values(gameState.pawns).filter(p => p.color !== pawn.color && gameState.activePlayers.includes(p.color) && p.position !== -1 && !p.isFinished);
+                    const bestTarget = aiFindBestSwitchTarget(pawn, potentialOpponents);
+                    if(bestTarget) {
+                        score += bestTarget.position - pawn.position; // Add net gain to score
+                    }
+                }
             }
 
             if(score > bestMove.score) {
@@ -1278,10 +1353,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- Utility Functions ---
-    const getCellByPawn = (pawn) => {
-        const [r, c] = getPawnCoords(pawn, true);
-        return board.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-    }
     const getGlobalPathIndex = (pawn) => pawn.position === -1 ? -1 : (pawn.position + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
     function getPawnCoords(pawn, returnGrid = false) {
         const { id, color, position, isFinished } = pawn;
@@ -1306,7 +1377,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (returnGrid) return [row, col];
         return [row * cellSize + centerOffset, col * cellSize + centerOffset];
     }
-
 
     // --- Initializer ---
     setupMenu();
