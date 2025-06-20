@@ -65,11 +65,14 @@
             position: absolute;
             top: calc(var(--cell-size) * 6); left: calc(var(--cell-size) * 6);
             width: calc(var(--cell-size) * 3); height: calc(var(--cell-size) * 3);
-            background: 
-                linear-gradient(45deg, var(--green-color) 50%, transparent 50.5%),
-                linear-gradient(135deg, var(--red-color) 50%, transparent 50.5%),
-                linear-gradient(225deg, var(--blue-color) 50%, transparent 50.5%),
-                linear-gradient(315deg, var(--yellow-color) 50%, transparent 50.5%);
+            /* FIX: Use conic-gradient for correct, non-overlapping triangles matching finish paths */
+            background: conic-gradient(
+                from -45deg,
+                var(--blue-color)   0 90deg,  /* Right triangle for Blue's finish path */
+                var(--yellow-color) 90deg 180deg, /* Bottom triangle for Yellow's finish path */
+                var(--green-color)  180deg 270deg, /* Left triangle for Green's finish path */
+                var(--red-color)    270deg 360deg  /* Top triangle for Red's finish path */
+            );
             z-index: 1;
         }
 
@@ -265,10 +268,9 @@
             const FINISH_PATH_LENGTH = 6;
 
             const PATH_DATA = {
-                PATH_COORDS: [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]],
+                PATH_COORDS: [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]],
                 FINISH_PATH_COORDS: {red:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],green:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],yellow:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],blue:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]},
-                // FIX: Corrected the start indices for Yellow and Blue
-                START_POSITIONS: { red: 0, green: 13, yellow: 25, blue: 38 },
+                START_POSITIONS: { red: 0, green: 13, yellow: 26, blue: 39 },
                 HOME_SPOTS: {red:[[1,1],[1,4],[4,1],[4,4]],green:[[1,10],[1,13],[4,10],[4,13]],yellow:[[10,10],[10,13],[13,10],[13,13]],blue:[[10,1],[10,4],[13,1],[13,4]]}
             };
             
@@ -448,21 +450,21 @@
                 const pawnSize = cellSize * 0.7;
                 const centerOffset = (cellSize - pawnSize) / 2;
 
-                if (position === -1) {
+                if (position === -1) { // In home base
                     const homeIndex = parseInt(pawnId.slice(-1));
                     const [row, col] = PATH_DATA.HOME_SPOTS[color][homeIndex];
                     return [row * cellSize + centerOffset, col * cellSize + centerOffset];
                 }
             
-                if (isFinished) {
+                if (isFinished) { // Center of the board
                     return [7 * cellSize + centerOffset, 7 * cellSize + centerOffset];
                 }
 
                 let coords;
-                if (position >= PATH_LENGTH) {
+                if (position >= PATH_LENGTH) { // On finish path
                     const finishIndex = position - PATH_LENGTH;
                     coords = PATH_DATA.FINISH_PATH_COORDS[color][finishIndex];
-                } else {
+                } else { // On main path
                     const pathIndex = getGlobalPathIndex(color, position);
                     coords = PATH_DATA.PATH_COORDS[pathIndex];
                 }
@@ -537,12 +539,12 @@
                 await movePawnWithAnimation(pawnId);
                 
                 updateBoardState(pawnId, oldPosition, pawn.position);
-                checkForCapture(pawn);
+                const captureOccurred = checkForCapture(pawn);
                 
                 updateAllPawnPositions();
                 checkForWin();
 
-                await endTurn(gameState.diceValue === 6);
+                await endTurn(gameState.diceValue === 6 || captureOccurred);
             }
 
             async function rollDice() {
@@ -566,37 +568,21 @@
                 gameState.isAnimating = false;
             }
 
-            function isBlockadeAt(globalIndex) {
-                const pawnsOnSquare = gameState.boardState[globalIndex];
-                if (!pawnsOnSquare || pawnsOnSquare.length < 2) return null;
-                const ownerColor = gameState.pawns[pawnsOnSquare[0]].color;
-                if (pawnsOnSquare.every(id => gameState.pawns[id].color === ownerColor)) {
-                    return ownerColor;
-                }
-                return null;
-            }
-
             function findMovablePawns() {
                 const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
                 const dice = gameState.diceValue;
 
                 return Object.values(gameState.pawns).filter(pawn => {
                     if (pawn.color !== currentPlayer || pawn.isFinished) return false;
+                    
+                    // A pawn in the home base can only move out on a 6
                     if (pawn.position === -1) return dice === 6;
 
+                    // A pawn cannot move past the finish line
                     const newPos = pawn.position + dice;
                     if (newPos >= PATH_LENGTH + FINISH_PATH_LENGTH) return false;
 
-                    if (pawn.position < PATH_LENGTH) {
-                        for (let i = 1; i <= dice; i++) {
-                            const stepGlobal = getGlobalPathIndex(pawn.color, pawn.position + i);
-                            if (stepGlobal === null) continue;
-                            const blockadeColor = isBlockadeAt(stepGlobal);
-                            if (blockadeColor && blockadeColor !== currentPlayer) {
-                                return false;
-                            }
-                        }
-                    }
+                    // REMOVED: Blockade check. All other moves are considered valid.
                     return true;
                 }).map(pawn => pawn.id);
             }
@@ -636,15 +622,19 @@
             }
 
             function checkForCapture(movedPawn) {
-                if (movedPawn.isFinished || movedPawn.position < 0 || movedPawn.position >= PATH_LENGTH) return;
+                if (movedPawn.isFinished || movedPawn.position < 0 || movedPawn.position >= PATH_LENGTH) return false;
                 
                 const movedGlobalIndex = getGlobalPathIndex(movedPawn.color, movedPawn.position);
                 const isSafeSquare = Object.values(PATH_DATA.START_POSITIONS).includes(movedGlobalIndex);
-                if (isSafeSquare || isBlockadeAt(movedGlobalIndex)) return;
+                
+                // REMOVED: Blockade check. Now only safe squares prevent capture.
+                if (isSafeSquare) return false;
                 
                 const victims = (gameState.boardState[movedGlobalIndex] || []).filter(id => 
                     gameState.pawns[id].color !== movedPawn.color
                 );
+
+                if (victims.length === 0) return false;
 
                 victims.forEach(victimId => {
                     const victimPawn = gameState.pawns[victimId];
@@ -654,6 +644,8 @@
                     updateBoardState(victimId, oldPos, -1);
                     placePawn(victimId);
                 });
+
+                return true;
             }
             
             function checkForWin() {
@@ -675,7 +667,15 @@
                     gameState.diceRolled = false;
                     gameState.isAnimating = false;
                     const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
-                    updateStatus(`Rolled a 6! <strong style="color:${PLAYERS[currentPlayer].color}">${currentPlayer.toUpperCase()}</strong> gets another turn.`);
+                    
+                    let message;
+                    if (gameState.diceValue === 6) {
+                        message = `Rolled a 6!`;
+                    } else {
+                        await sleep(500); 
+                        message = `Bonus turn for the capture!`;
+                    }
+                    updateStatus(`${message} <strong style="color:${PLAYERS[currentPlayer].color}">${currentPlayer.toUpperCase()}</strong>, roll again.`);
                     
                     if (gameState.playerTypes[currentPlayer] === 'ai') {
                         diceEl.style.pointerEvents = 'none';
@@ -751,22 +751,25 @@
                     const newPos = (pawn.position === -1) ? 0 : pawn.position + dice;
                     let score = 0;
 
+                    // Highest priority: finishing a pawn
                     if (newPos === PATH_LENGTH + FINISH_PATH_LENGTH - 1) score += 1000;
+                    // Priority: getting a pawn out of home
                     if (pawn.position === -1) score += 50;
+                    // General progress is good
                     score += newPos;
                     
                     if (newPos < PATH_LENGTH) {
                         const newGlobalIndex = getGlobalPathIndex(pawn.color, newPos);
                         const isSafe = Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex);
                         
-                        if (!isSafe && !isBlockadeAt(newGlobalIndex)) {
+                        // REMOVED: Blockade check. AI now checks for captures on any non-safe square.
+                        if (!isSafe) {
                             const opponentOnSquare = (gameState.boardState[newGlobalIndex] || []).some(id => gameState.pawns[id].color !== pawn.color);
-                            if (opponentOnSquare) score += 75;
+                            if (opponentOnSquare) score += 75; // High value on capturing
                         }
-                        if (isSafe) score += 20;
-                        const willCreateBlockade = (gameState.boardState[newGlobalIndex] || []).some(id => gameState.pawns[id].color === currentPlayer);
-                        if(willCreateBlockade) score += 35;
+                        if (isSafe) score += 20; // Bonus for landing on a safe square
                     }
+                    
                     if(score > bestMove.score) bestMove = { pawnId, score };
                 }
                 return bestMove.pawnId || movablePawns[Math.floor(Math.random() * movablePawns.length)];
