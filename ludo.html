@@ -491,30 +491,18 @@ document.addEventListener('DOMContentLoaded', () => {
         blue: { color: 'var(--blue-color)', glow: 'rgba(9, 132, 227, 0.7)' }
     };
     const PLAYER_ORDER = ['red', 'green', 'yellow', 'blue'];
-    const PATH_LENGTH = 52;
-    const FINISH_PATH_LENGTH = 6;
-    const TOTAL_PATH_LENGTH = PATH_LENGTH + FINISH_PATH_LENGTH;
-
+    
     const PATH_DATA = {
-        PATH_COORDS: [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[7,0],[6,0]], // Corrected: removed extra [6,0]
+        PATH_COORDS: [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[7,0],[6,0]],
         FINISH_PATH_COORDS: {red:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],green:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],yellow:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],blue:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]},
-        START_POSITIONS: { red: 0, green: 13, yellow: 26, blue: 39 }, // Adjusted for 0-indexed PATH_COORDS
+        START_POSITIONS: { red: 0, green: 13, yellow: 26, blue: 39 },
         HOME_SPOTS: {red:[[1,1],[1,4],[4,1],[4,4]],green:[[1,10],[1,13],[4,10],[4,13]],yellow:[[10,10],[10,13],[13,10],[13,13]],blue:[[10,1],[10,4],[13,1],[13,4]]}
     };
-     // Corrected start positions to be 0-indexed if PATH_COORDS[0] is red's start, etc.
-     // Original: red:1, green:14, yellow:27, blue:40
-     // If PATH_COORDS[0] is [6,1] which is red's actual start, then red start is index 0.
-     // Green start is 13th cell on path (index 13 from red's start)
-     // Yellow start is 26th cell on path (index 26 from red's start)
-     // Blue start is 39th cell on path (index 39 from red's start)
-     // Let's re-verify PATH_DATA.PATH_COORDS with the classic Ludo image.
-     // Red start: cell after home path, e.g., (6,1)
-     // Path: (6,1)...(6,5), (5,6)...(0,6), (0,7), (0,8)...(5,8), (6,9)...(6,13), (7,14)...
-     // Red start is PATH_COORDS[0] = (6,1). So START_POSITIONS.red should be 0.
-     // Green start is PATH_COORDS[13] = (1,8). So START_POSITIONS.green should be 13.
-     // Yellow start is PATH_COORDS[26] = (8,13). So START_POSITIONS.yellow should be 26.
-     // Blue start is PATH_COORDS[39] = (13,6). So START_POSITIONS.blue should be 39.
-     // This seems correct if PATH_COORDS is the global path starting from red's start.
+
+    const MAIN_PATH_LOGICAL_LENGTH = PATH_DATA.PATH_COORDS.length; // Should be 51
+    const FINISH_PATH_LENGTH = 6;
+    const TOTAL_LOGICAL_PATH_LENGTH = MAIN_PATH_LOGICAL_LENGTH + FINISH_PATH_LENGTH;
+
 
     // --- Game State Variables ---
     let gameState = {};
@@ -539,25 +527,57 @@ document.addEventListener('DOMContentLoaded', () => {
             checkStartButtonState();
         });
 
-        startGameBtn.addEventListener('click', () => {
+        startGameBtn.addEventListener('click', async () => { // Made async
             if (startGameBtn.disabled) return;
             mainMenu.style.display = 'none';
             gameContainer.style.display = 'flex';
             
             const humanColors = Object.values(menuState.playerSelections);
-            const aiColorsNeeded = menuState.numPlayers - humanColors.length;
-            const availableAIColors = PLAYER_ORDER.filter(c => !humanColors.includes(c));
-            const aiColors = availableAIColors.slice(0, aiColorsNeeded);
+            const aiColorsNeeded = menuState.numPlayers - humanColors.length; // This logic needs adjustment
+            // It should be total selected players from menu vs human players chosen for color
+            // Simpler: total active players selected in menu (numPlayers)
+            // Colors chosen are for human players. Remaining are AI.
             
-            const currentActivePlayers = [...humanColors, ...aiColors].sort((a,b) => PLAYER_ORDER.indexOf(a) - PLAYER_ORDER.indexOf(b));
-            
+            const chosenHumanColors = Object.values(menuState.playerSelections);
+            const activePlayerColors = [];
             const playerTypes = {};
-            PLAYER_ORDER.forEach(color => {
-                if (currentActivePlayers.includes(color)) {
-                    playerTypes[color] = humanColors.includes(color) ? 'human' : 'ai';
+
+            // Assign colors based on PLAYER_ORDER for active players
+            let humanColorIndex = 0;
+            for (let i = 0; i < menuState.numPlayers; i++) {
+                const colorForThisSlot = PLAYER_ORDER[i]; // Take colors in fixed order for active slots
+                activePlayerColors.push(colorForThisSlot);
+                if (chosenHumanColors.includes(colorForThisSlot)) {
+                    playerTypes[colorForThisSlot] = 'human';
+                } else {
+                    playerTypes[colorForThisSlot] = 'ai';
                 }
+            }
+            // Ensure chosenHumanColors are actually part of the first numPlayers colors
+            // The menu allows choosing any color for Player 1, Player 2 etc. up to numPlayers.
+            // This needs to map to fixed game colors (Red, Green, Yellow, Blue)
+            // Let's refine player/color assignment:
+            // Player 1 in menu picks a color. That color becomes P1.
+            // If numPlayers is 2, Player 2 picks another color.
+            // The game will use specific colors (Red, Green, etc.).
+            // The menu current setup implies Player 1 (human) *chooses* to be Red, Green, etc.
+            
+            // Corrected player setup based on menu choice:
+            const gamePlayerColors = PLAYER_ORDER.slice(0, menuState.numPlayers); // These are the colors IN THE GAME (Red, Green, then Yellow, Blue if 3-4p)
+            const finalPlayerTypes = {};
+            gamePlayerColors.forEach(gameColor => {
+                // Check if any human player in the menu selected this gameColor
+                let isHuman = false;
+                for (const playerId in menuState.playerSelections) { // playerId is "player1", "player2"
+                    if (menuState.playerSelections[playerId] === gameColor) {
+                        isHuman = true;
+                        break;
+                    }
+                }
+                finalPlayerTypes[gameColor] = isHuman ? 'human' : 'ai';
             });
-            initGame(playerTypes, menuState.numPlayers, currentActivePlayers);
+
+            await initGame(finalPlayerTypes, menuState.numPlayers, gamePlayerColors); // await for initGame
         });
 
         rulesBtn.onclick = () => rulesModal.style.display = 'flex';
@@ -570,21 +590,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function createColorSelectors() {playerColorSelectorsContainer.innerHTML = '';for (let i = 1; i <= 4; i++) {playerColorSelectorsContainer.innerHTML += `<div id="player-${i}-selector" class="player-selector hidden"><span>Player ${i}:</span><div class="color-options" data-player-id="player${i}">${PLAYER_ORDER.map(c => `<div class="color-choice ${c}" data-color="${c}"></div>`).join('')}</div></div>`;}}
-    function updatePlayerSelectorVisibility(num) {for (const playerId in menuState.playerSelections) {const playerNum = parseInt(playerId.replace('player', ''));if (playerNum > num) {delete menuState.playerSelections[playerId];}}for (let i = 1; i <= 4; i++) {const selector = document.getElementById(`player-${i}-selector`);if (i <= num) {selector.classList.remove('hidden');} else {selector.classList.add('hidden');}}}
+    function createColorSelectors() {playerColorSelectorsContainer.innerHTML = '';for (let i = 1; i <= 4; i++) {playerColorSelectorsContainer.innerHTML += `<div id="player-${i}-selector" class="player-selector hidden"><span>Player ${i} (Human):</span><div class="color-options" data-player-id="player${i}">${PLAYER_ORDER.map(c => `<div class="color-choice ${c}" data-color="${c}"></div>`).join('')}</div></div>`;}}
+    function updatePlayerSelectorVisibility(numHumanPlayers) {
+        // Clear selections for players no longer active
+        for (const playerId in menuState.playerSelections) {
+            const playerNum = parseInt(playerId.replace('player', ''));
+            if (playerNum > numHumanPlayers) {
+                delete menuState.playerSelections[playerId];
+            }
+        }
+        // Show/hide selectors
+        for (let i = 1; i <= 4; i++) {
+            const selector = document.getElementById(`player-${i}-selector`);
+            if (i <= numHumanPlayers) { // num is number of HUMAN players
+                selector.classList.remove('hidden');
+            } else {
+                selector.classList.add('hidden');
+            }
+        }
+    }
     function addColorChoiceListeners() {document.querySelectorAll('.color-choice').forEach(choice => {choice.addEventListener('click', (e) => {const color = e.target.dataset.color;const playerId = e.target.parentElement.dataset.playerId;if (Object.values(menuState.playerSelections).includes(color) && menuState.playerSelections[playerId] !== color) {return;}if (menuState.playerSelections[playerId] === color) {delete menuState.playerSelections[playerId];} else {menuState.playerSelections[playerId] = color;}updateSelectedColorsUI();checkStartButtonState();});});}
     function updateSelectedColorsUI() {const takenColors = Object.values(menuState.playerSelections);document.querySelectorAll('.color-choice').forEach(choice => {const color = choice.dataset.color;const playerId = choice.parentElement.dataset.playerId;choice.classList.remove('selected', 'taken');if (menuState.playerSelections[playerId] === color) {choice.classList.add('selected');} else if (takenColors.includes(color)) {choice.classList.add('taken');}});}
-    function checkStartButtonState() {startGameBtn.disabled = Object.keys(menuState.playerSelections).length !== menuState.numPlayers;}
+    function checkStartButtonState() {
+        // Start button enabled if number of human players selected matches the number of colors picked
+        const numHumanPlayers = parseInt(document.querySelector('input[name="player-count"]:checked').value);
+        startGameBtn.disabled = Object.keys(menuState.playerSelections).length !== numHumanPlayers;
+    }
+
 
     // --- Game Initialization ---
-    function initGame(playerTypes, numPlayers, currentActivePlayers) {
+    async function initGame(playerTypes, numGamePlayers, currentActivePlayers) { // playerTypes maps gameColor to 'human'/'ai'
         createBoardVisuals();
         createDiceVisuals();
 
         gameState = {
-            playerTypes,
-            numPlayers,
-            activePlayers: currentActivePlayers,
+            playerTypes, // e.g. {red: 'human', green: 'ai'}
+            numPlayers: numGamePlayers, // Total players in this game (e.g., 2, 3, or 4)
+            activePlayers: currentActivePlayers, // Array of colors in play e.g. ['red', 'green']
             currentPlayerIndex: -1,
             diceValue: null,
             diceRolled: false,
@@ -598,18 +640,23 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         gameState.activePlayers.forEach(color => {
-            gameState.playersState[color] = { isTrapped: false }; // Removed threeRollAttempt and hasExtraRoll
+            gameState.playersState[color] = { isTrapped: false };
             for (let i = 0; i < 4; i++) {
                 const pawnId = `${color}-pawn-${i}`;
                 gameState.pawns[pawnId] = { id: pawnId, color: color, position: -1, isFinished: false, stackSize: 1 };
             }
         });
         
+        // Ensure board is rendered and dimensions are available
+        await new Promise(resolve => requestAnimationFrame(resolve)); 
+
         renderAllPawns();
-        renderDice(1); // Show initial dice face
+        renderDice(1); 
+        
         addToLog('Game started. Good luck!');
         diceEl.addEventListener('click', handleHumanRoll);
-        switchPlayer();
+        
+        switchPlayer(); // This will set the first player and update turn indicator
     }
 
     // --- Visuals and Board Setup ---
@@ -635,7 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.values(PATH_DATA.FINISH_PATH_COORDS).flat().forEach(c => getCell(c[0],c[1]).classList.add('path'));
         
         Object.entries(PATH_DATA.START_POSITIONS).forEach(([color, pathStartIndex]) => {
-            const [r,c] = PATH_DATA.PATH_COORDS[pathStartIndex]; // pathStartIndex is the index on the common path
+            const [r,c] = PATH_DATA.PATH_COORDS[pathStartIndex];
             getCell(r,c).classList.add('start', color);
         });
 
@@ -645,20 +692,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderAllPawns() {
         document.querySelectorAll('.pawn').forEach(p => p.remove());
+        if (!board.clientWidth) { // Guard against rendering if board not sized
+            console.warn("Board not sized, delaying pawn rendering.");
+            requestAnimationFrame(renderAllPawns);
+            return;
+        }
         for (const pawnId in gameState.pawns) {
             const pawn = gameState.pawns[pawnId];
-            // Pawns are created only for active players, so this check is mostly for safety
             if (!gameState.activePlayers.includes(pawn.color)) continue; 
             
             const pawnEl = document.createElement('div');
             pawnEl.className = `pawn ${pawn.color}`;
             pawnEl.id = pawnId;
             const [top, left] = getPawnCoords(pawn);
-            pawnEl.style.transition = 'none'; // Disable transition for initial placement
+            pawnEl.style.transition = 'none'; 
             pawnEl.style.top = `${top}px`;
             pawnEl.style.left = `${left}px`;
-            pawnEl.offsetHeight; // Force reflow
-            pawnEl.style.transition = ''; // Re-enable for future moves
+            pawnEl.offsetHeight; 
+            pawnEl.style.transition = ''; 
             pawnEl.addEventListener('click', () => handlePawnClick(pawnId));
             pawnEl.addEventListener('mouseenter', () => handlePawnHover(pawnId, true));
             pawnEl.addEventListener('mouseleave', () => handlePawnHover(pawnId, false));
@@ -668,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function createDiceVisuals() {
         diceEl.innerHTML = '';
-        const gridAreasFor6 = ["a . c", "f . g", "d . b"]; // middle row pips: f, g
+        const gridAreasFor6 = ["a . c", "f . g", "d . b"]; 
         for (let i = 1; i <= 6; i++) {
             const face = document.createElement('div');
             face.className = `dice-face face-${i}`;
@@ -680,7 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderDice(value) { // Simplified renderDice, sets the final face
+    function renderDice(value) { 
         const diceFacesTransforms = {
             1: 'rotateY(0deg) translateZ(40px)',
             2: 'rotateY(-90deg) translateZ(40px)',
@@ -718,16 +769,16 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let targetCell;
 
-        if (newPos >= TOTAL_PATH_LENGTH) {
+        if (newPos >= TOTAL_LOGICAL_PATH_LENGTH) {
             // Can't highlight finish square if it means exact landing
-        } else if (newPos >= PATH_LENGTH) {
-            const finishIndex = newPos - PATH_LENGTH;
-            if (finishIndex < FINISH_PATH_LENGTH) { // Check bounds
+        } else if (newPos >= MAIN_PATH_LOGICAL_LENGTH) {
+            const finishIndex = newPos - MAIN_PATH_LOGICAL_LENGTH;
+            if (finishIndex < FINISH_PATH_LENGTH) { 
                 const [r, c] = PATH_DATA.FINISH_PATH_COORDS[pawn.color][finishIndex];
                 targetCell = board.querySelector(`[data-row="${r}"][data-col="${c}"]`);
             }
         } else {
-             const targetGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
+             const targetGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % MAIN_PATH_LOGICAL_LENGTH;
              const [r, c] = PATH_DATA.PATH_COORDS[targetGlobalIndex];
              targetCell = board.querySelector(`[data-row="${r}"][data-col="${c}"]`);
         }
@@ -739,40 +790,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function rollDiceAndFindMoves(isAI = false) {
-        gameState.isAnimating = true; // Lock game during roll and decision
+        gameState.isAnimating = true; 
         diceEl.classList.remove('active');
-        await rollDice(); // rollDice now handles animation and sets gameState.diceValue
+        await rollDice(); 
         
         const currentPlayer = gameState.activePlayers[gameState.currentPlayerIndex];
-        // Removed threeRollAttempt logic
-
         const movablePawns = findMovablePawns();
 
         if (movablePawns.length > 0) {
             if (!isAI) {
                 movablePawns.forEach(pawnId => document.getElementById(pawnId).classList.add('movable'));
                 updateStatus("Choose a pawn to move.");
-                gameState.isAnimating = false; // Unlock for human choice
+                gameState.isAnimating = false; 
             }
-            // For AI, isAnimating remains true until AI makes a move
             return movablePawns;
         } else {
-            // No moves possible
             addToLog(`${currentPlayer.toUpperCase()} has no available moves.`);
-            if (gameState.diceValue === 6) { // Rolled a 6, but no valid moves (e.g., all pawns blocked/finished)
+            if (gameState.diceValue === 6) { 
                 updateStatus("No moves, but you rolled a 6! Roll again.");
-                gameState.diceRolled = false; // Allow re-roll
-                gameState.isAnimating = false; // Unlock for next roll
+                gameState.diceRolled = false; 
+                gameState.isAnimating = false; 
                 if (!isAI) {
                     diceEl.classList.add('active');
-                } else {
-                    // AI will re-roll in its next executeAITurn loop
-                    // No need for setTimeout here, the AI loop will handle it
                 }
-            } else { // Did not roll a 6 and no moves
+            } else { 
                 updateStatus("No possible moves. Turn passes.");
                 addToLog(`${currentPlayer.toUpperCase()}'s turn ends.`);
-                gameState.isAnimating = false; // Unlock for pass or AI's next turn sequence
+                gameState.isAnimating = false; 
                 if(!isAI) {
                     passTurnBtn.style.display = 'block';
                 } else {
@@ -780,7 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     switchPlayer();
                 }
             }
-            return null; // Signal no pawn was selected for move
+            return null; 
         }
     }
 
@@ -795,17 +839,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         await updateStacks(pawn, originalPosition);
         checkForCapture(pawn);
-        await sleep(200); // Small pause after capture/stack
+        await sleep(200); 
 
-        // Removed handleSpecialSquare logic
-        
         checkForWin();
         if (gameState.gameWon) return;
 
         const currentPlayer = gameState.activePlayers[gameState.currentPlayerIndex];
         if (gameState.diceValue !== 6) {
             switchPlayer();
-        } else { // Rolled a 6, gets another turn
+        } else { 
             gameState.diceRolled = false;
             gameState.isAnimating = false;
             addToLog(`${pawn.color.toUpperCase()} rolled a 6 and gets another turn.`);
@@ -814,30 +856,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (gameState.playerTypes[pawn.color] === 'human') {
                 diceEl.classList.add('active');
             } else {
-                setTimeout(executeAITurn, 500); // AI takes its extra turn
+                setTimeout(executeAITurn, 500); 
             }
         }
     }
     
     async function rollDice() {
-        gameState.diceRolled = true; // Mark dice as "used" for this turn segment
-        // gameState.isAnimating = true; // This is usually set by the caller
-
+        gameState.diceRolled = true; 
         diceEl.classList.add('rolling');
-        // Set a random starting orientation before spin for variety
         const randomX = Math.floor(Math.random() * 4) * 90;
         const randomY = Math.floor(Math.random() * 4) * 90;
-        // Ensure translateZ is part of the initial transform for perspective
         diceEl.style.transform = `rotateX(${randomX}deg) rotateY(${randomY}deg) translateZ(40px)`;
 
-        // Wait for the CSS animation to complete
         await new Promise(resolve => setTimeout(resolve, parseFloat(getComputedStyle(root).getPropertyValue('--dice-roll-duration')) * 1000));
 
         diceEl.classList.remove('rolling');
         gameState.diceValue = Math.floor(Math.random() * 6) + 1;
-        renderDice(gameState.diceValue); // renderDice now just sets the final face
-        updateStatus(); // Update status with current player and dice roll
-        // gameState.isAnimating should be managed by the calling function (rollDiceAndFindMoves)
+        renderDice(gameState.diceValue); 
+        updateStatus(); 
     }
 
     
@@ -846,38 +882,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return Object.values(gameState.pawns).filter(pawn => {
             if (pawn.color !== currentPlayer || pawn.isFinished) return false;
             
-            if (pawn.position === -1) return gameState.diceValue === 6; // Must roll 6 to get out
+            if (pawn.position === -1) return gameState.diceValue === 6;
 
             const targetPos = pawn.position + gameState.diceValue;
-            if (targetPos >= TOTAL_PATH_LENGTH) { // Exact landing or less for finish
-                 return targetPos === TOTAL_PATH_LENGTH; // Must land exactly on the finish spot (or less if finish path is shorter)
+            if (targetPos >= TOTAL_LOGICAL_PATH_LENGTH) { 
+                 return targetPos === TOTAL_LOGICAL_PATH_LENGTH; 
             }
 
-
-            // Check for blockades on the main path
-            // Pawns can jump over blockades on their own finish path
-            if (targetPos < PATH_LENGTH) {
+            if (targetPos < MAIN_PATH_LOGICAL_LENGTH) {
                 for (let i = pawn.position + 1; i < targetPos; i++) {
-                    // i is relative to player's start. Convert to global path index.
                     const stepGlobalIndex = getGlobalPathIndex({ ...pawn, position: i });
                     
                     const pawnsOnStep = Object.values(gameState.pawns).filter(p => 
                         p.position !== -1 && 
                         !p.isFinished && 
-                        p.position < PATH_LENGTH && // only check blockades on main path
+                        p.position < MAIN_PATH_LOGICAL_LENGTH && 
                         getGlobalPathIndex(p) === stepGlobalIndex
                     );
 
-                    if (pawnsOnStep.length < 2) continue; // Not a blockade by count
+                    if (pawnsOnStep.length < 2) continue;
 
-                    // Check if these pawns form a blockade (2 or more of the SAME color)
                     const pawnsByColorOnStep = pawnsOnStep.reduce((acc, p) => {
                         acc[p.color] = (acc[p.color] || 0) + 1;
                         return acc;
                     }, {});
 
                     for (const color in pawnsByColorOnStep) {
-                        if(pawnsByColorOnStep[color] >= 2) return false; // Blockade found
+                        if(pawnsByColorOnStep[color] >= 2) return false; 
                     }
                 }
             }
@@ -890,8 +921,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const startPos = pawn.position;
         const diceOrBoost = steps || gameState.diceValue;
 
-        if (startPos === -1 && gameState.diceValue === 6) { // Getting out
-            pawn.position = 0; // Move to player's relative start (0)
+        if (startPos === -1 && gameState.diceValue === 6) { 
+            pawn.position = 0; 
             if (gameState.isSoundOn) hopSound.play();
             pawnEl.classList.add('hopping');
             const [top, left] = getPawnCoords(pawn);
@@ -901,47 +932,46 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             for (let i = 1; i <= diceOrBoost; i++) {
                 const newPos = startPos + i;
-                if (newPos > TOTAL_PATH_LENGTH) break; // Should not happen if findMovablePawns is correct
+                if (newPos > TOTAL_LOGICAL_PATH_LENGTH) break; 
                 pawn.position = newPos;
 
                 pawnEl.classList.add('hopping');
                 if (gameState.isSoundOn) { hopSound.currentTime = 0; hopSound.play(); }
                 const [top, left] = getPawnCoords(pawn);
                 pawnEl.style.top = `${top}px`; pawnEl.style.left = `${left}px`;
-                // Adjust hop speed for finish path
-                await sleep(pawn.position >= PATH_LENGTH ? (parseFloat(getComputedStyle(root).getPropertyValue('--hop-duration'))*1000 * 1.5) : (parseFloat(getComputedStyle(root).getPropertyValue('--hop-duration'))*1000));
+                await sleep(pawn.position >= MAIN_PATH_LOGICAL_LENGTH ? (parseFloat(getComputedStyle(root).getPropertyValue('--hop-duration'))*1000 * 1.5) : (parseFloat(getComputedStyle(root).getPropertyValue('--hop-duration'))*1000));
                 pawnEl.classList.remove('hopping');
-                await sleep(parseFloat(getComputedStyle(root).getPropertyValue('--hop-interval'))*1000 / 5); // Shorter pause between hops
+                await sleep(parseFloat(getComputedStyle(root).getPropertyValue('--hop-interval'))*1000 / 5); 
             }
         }
-        if (pawn.position === TOTAL_PATH_LENGTH) {
+        if (pawn.position === TOTAL_LOGICAL_PATH_LENGTH) {
             pawn.isFinished = true;
             addToLog(`${pawn.color.toUpperCase()}'s pawn reached home!`);
         }
     }
 
     async function updateStacks(movedPawn, previousPosition) {
-        // Unstack from original location if it was on the board and not home
         if (previousPosition !== -1) {
             const previousGlobalIndex = getGlobalPathIndex({ ...movedPawn, position: previousPosition });
-            // Only consider pawns on the main path or own finish line for stacking
-            if (previousPosition < PATH_LENGTH || (previousPosition >= PATH_LENGTH && PATH_DATA.FINISH_PATH_COORDS[movedPawn.color].some(coord => {
-                const [r,c] = getPawnCoords({...movedPawn, position: previousPosition}, true);
-                return coord[0] === r && coord[1] === c;
+            if (previousPosition < MAIN_PATH_LOGICAL_LENGTH || (previousPosition >= MAIN_PATH_LOGICAL_LENGTH && PATH_DATA.FINISH_PATH_COORDS[movedPawn.color].some(coord => {
+                const [r,c] = getPawnCoords({...movedPawn, position: previousPosition}, true); // Get grid coords
+                // Check if grid coords [r,c] are in this player's finish path
+                 return PATH_DATA.FINISH_PATH_COORDS[movedPawn.color].find(fc => fc[0] === r && fc[1] === c);
             }))) {
                  const pawnsOnOldSquare = Object.values(gameState.pawns).filter(p => 
                     p.color === movedPawn.color && 
                     !p.isFinished && p.position !== -1 && 
-                    getGlobalPathIndex(p) === previousGlobalIndex && // Check main path
-                    (p.position < PATH_LENGTH || getGlobalPathIndex(p) === getGlobalPathIndex({ ...movedPawn, position: previousPosition })) // Or same finish path spot
+                    // For main path, compare global indices
+                    ( (p.position < MAIN_PATH_LOGICAL_LENGTH && previousPosition < MAIN_PATH_LOGICAL_LENGTH && getGlobalPathIndex(p) === previousGlobalIndex) ||
+                    // For finish path, compare exact relative positions
+                      (p.position >= MAIN_PATH_LOGICAL_LENGTH && previousPosition >= MAIN_PATH_LOGICAL_LENGTH && p.position === previousPosition) )
                 );
                 pawnsOnOldSquare.forEach(pawnToUpdate => updatePawnStackSize(pawnToUpdate.id, pawnsOnOldSquare.length));
             }
         }
 
-        // Now, check for new stack at destination
         if (movedPawn.isFinished || movedPawn.position === -1) {
-            updatePawnStackSize(movedPawn.id, 1); // Reset stack size if finished or home
+            updatePawnStackSize(movedPawn.id, 1); 
             return;
         }
 
@@ -949,8 +979,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const pawnsOnNewSquare = Object.values(gameState.pawns).filter(p => 
             p.color === movedPawn.color && 
             !p.isFinished && p.position !== -1 &&
-            getGlobalPathIndex(p) === currentGlobalIndex &&
-            (p.position < PATH_LENGTH || getGlobalPathIndex(p) === getGlobalPathIndex(movedPawn))
+            ( (p.position < MAIN_PATH_LOGICAL_LENGTH && movedPawn.position < MAIN_PATH_LOGICAL_LENGTH && getGlobalPathIndex(p) === currentGlobalIndex) ||
+              (p.position >= MAIN_PATH_LOGICAL_LENGTH && movedPawn.position >= MAIN_PATH_LOGICAL_LENGTH && p.position === movedPawn.position) )
         );
         const newStackSize = pawnsOnNewSquare.length;
         pawnsOnNewSquare.forEach(pawnToUpdate => updatePawnStackSize(pawnToUpdate.id, newStackSize));
@@ -975,10 +1005,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function checkForCapture(movedPawn) {
-        if (movedPawn.isFinished || movedPawn.position < 0 || movedPawn.position >= PATH_LENGTH) return; // No capture on finish path or home
+        if (movedPawn.isFinished || movedPawn.position < 0 || movedPawn.position >= MAIN_PATH_LOGICAL_LENGTH) return; 
         
         const movedGlobalIndex = getGlobalPathIndex(movedPawn);
-        // Check if the landing square is a start square (safe square)
         const isStartSquare = Object.values(PATH_DATA.START_POSITIONS).includes(movedGlobalIndex);
         if (isStartSquare) return; 
 
@@ -986,20 +1015,18 @@ document.addEventListener('DOMContentLoaded', () => {
             otherPawn.color !== movedPawn.color && 
             !otherPawn.isFinished && 
             otherPawn.position !== -1 &&
-            otherPawn.position < PATH_LENGTH && // Opponent must be on main path
+            otherPawn.position < MAIN_PATH_LOGICAL_LENGTH && 
             getGlobalPathIndex(otherPawn) === movedGlobalIndex);
             
         if (opponentsOnSquare.length > 0) {
-            // Stack capture rule: movedPawn's stack must be >= opponent's stack
-            const opponentStackSize = opponentsOnSquare[0].stackSize; // Assuming all opponents on a square form one stack
+            const opponentStackSize = opponentsOnSquare[0].stackSize; 
             if (movedPawn.stackSize >= opponentStackSize) {
                 addToLog(`${movedPawn.color.toUpperCase()} captured ${opponentsOnSquare[0].color.toUpperCase()}'s stack!`);
                 opponentsOnSquare.forEach(capturedPawn => {
-                    capturedPawn.position = -1; // Send back to home
-                    updatePawnStackSize(capturedPawn.id, 1); // Reset stack size
+                    capturedPawn.position = -1; 
+                    updatePawnStackSize(capturedPawn.id, 1); 
                     const capturedPawnEl = document.getElementById(capturedPawn.id);
                     const [top, left] = getPawnCoords(capturedPawn);
-                    // Animate return to home
                     capturedPawnEl.classList.add('hopping');
                     capturedPawnEl.style.top = `${top}px`; 
                     capturedPawnEl.style.left = `${left}px`;
@@ -1021,13 +1048,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const place = ["1st", "2nd", "3rd"][gameState.winners.length - 1] || `${gameState.winners.length}th`;
             addToLog(`${currentPlayer.toUpperCase()} finished in ${place} place!`);
             
-            // Game ends if numWinners = numPlayers - 1 (or if only 1 player left and numPlayers > 1)
             if (gameState.numPlayers > 1 && gameState.winners.length >= gameState.numPlayers - 1) {
                 gameState.gameWon = true;
                 const lastPlayer = gameState.activePlayers.find(p => !gameState.winners.includes(p));
                 if (lastPlayer && !gameState.winners.includes(lastPlayer)) gameState.winners.push(lastPlayer);
                 showWinnerPodium();
-            } else if (gameState.numPlayers === 1 && gameState.winners.length === 1) { // Single player game ends when they win
+            } else if (gameState.numPlayers === 1 && gameState.winners.length === 1) { 
                 gameState.gameWon = true;
                 showWinnerPodium();
             }
@@ -1039,7 +1065,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearHighlights();
         passTurnBtn.style.display = 'none';
         
-        gameState.isAnimating = false; // Ensure game is unlocked before switching
+        gameState.isAnimating = false; 
         gameState.diceRolled = false;
         gameState.diceValue = null;
 
@@ -1054,31 +1080,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if(!nextPlayerFound || gameState.gameWon) {
-            // gameState.isAnimating = true; // Stop further actions if game won or no one to switch to
             return;
         }
 
         const currentPlayer = gameState.activePlayers[gameState.currentPlayerIndex];
         updateTurnIndicator();
-        
-        // Removed trap logic
-
-        updateStatus(); // Update status for the new player
+        updateStatus(); 
 
         if (gameState.playerTypes[currentPlayer] === 'ai' && !gameState.gameWon) {
             diceEl.style.pointerEvents = 'none';
-            gameState.isAnimating = true; // AI will take over, lock interactions
+            gameState.isAnimating = true; 
             setTimeout(executeAITurn, 1000);
         } else if (!gameState.gameWon) {
             diceEl.style.pointerEvents = 'auto';
             diceEl.classList.add("active");
-            gameState.isAnimating = false; // Ready for human input
+            gameState.isAnimating = false; 
         }
     }
 
     function updateStatus(message = "") {
+        if (!gameState.activePlayers || gameState.activePlayers.length === 0 || gameState.currentPlayerIndex === -1) {
+             statusEl.innerHTML = message || "Initializing..."; // Or some default
+             return;
+        }
         const currentPlayer = gameState.activePlayers[gameState.currentPlayerIndex];
         if (!currentPlayer) return;
+
         const playerInfo = PLAYERS[currentPlayer];
         const playerType = gameState.playerTypes[currentPlayer];
 
@@ -1100,6 +1127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function updateTurnIndicator() {
+        if (!board.clientWidth) return; // Don't update if board not sized
         const currentPlayer = gameState.activePlayers[gameState.currentPlayerIndex];
         if (!currentPlayer) return;
 
@@ -1150,56 +1178,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- AI Logic ---
     async function executeAITurn() {
-        if (gameState.gameWon || gameState.playerTypes[gameState.activePlayers[gameState.currentPlayerIndex]] !== 'ai') {
-            gameState.isAnimating = false; // Ensure unlocked if AI turn is skipped
+        if (gameState.gameWon || !gameState.activePlayers[gameState.currentPlayerIndex] || gameState.playerTypes[gameState.activePlayers[gameState.currentPlayerIndex]] !== 'ai') {
+            gameState.isAnimating = false; 
             return;
         }
         
-        gameState.isAnimating = true; // Make sure it's locked during AI turn
+        gameState.isAnimating = true; 
         const currentPlayer = gameState.activePlayers[gameState.currentPlayerIndex];
         updateStatus(`${currentPlayer.toUpperCase()} (AI) is thinking...`);
         await sleep(800);
 
-        // If dice hasn't been rolled yet for this turn (e.g. start of turn, or after a 6)
         if (!gameState.diceRolled) {
-            const movablePawns = await rollDiceAndFindMoves(true); // isAI = true
+            const movablePawns = await rollDiceAndFindMoves(true); 
 
             if (movablePawns && movablePawns.length > 0) {
                 await sleep(500);
                 const bestPawnId = aiChooseBestMove(movablePawns);
-                await executeMove(bestPawnId); // executeMove will handle further AI turns if a 6 was rolled
+                await executeMove(bestPawnId); 
             } else {
-                 // No movable pawns after roll.
-                 // rollDiceAndFindMoves handles "6 but no moves" (AI will roll again in next executeAITurn call)
-                 // or "not 6 and no moves" (switchPlayer called by rollDiceAndFindMoves).
-                 // If it was "6 but no moves", diceRolled is false, isAnimating is false.
-                 // So, if AI's turn again, it will re-enter this function and roll.
-                 if (!gameState.diceRolled && gameState.diceValue === 6) { // AI rolled 6, no moves, gets to roll again
+                 if (!gameState.diceRolled && gameState.diceValue === 6) { 
                     setTimeout(executeAITurn, 500);
-                 } else if (gameState.diceRolled) { // Dice was rolled, no moves, not a 6 (or switchPlayer was called)
-                    // If switchPlayer wasn't called (e.g. human turn waiting for pass),
-                    // this branch means AI turn is over. But rollDiceAndFindMoves should handle switch for AI.
-                    // This else branch might not be strictly necessary if rollDiceAndFindMoves correctly handles all scenarios.
-                    gameState.isAnimating = false; // Ensure unlock if turn somehow ends here
+                 } else if (gameState.diceRolled) { 
+                    gameState.isAnimating = false; 
                  }
             }
         } else {
-            // This case should ideally not be reached if logic is tight,
-            // as diceRolled should be false at the start of a decision point.
-            // If AI's turn and dice already rolled, it means it's waiting for a pawn choice which is instant for AI.
-            // This might indicate a state error. For now, try to recover.
             console.warn("AI turn with dice already rolled. Attempting to find moves.");
             const movablePawns = findMovablePawns();
             if (movablePawns && movablePawns.length > 0) {
                 const bestPawnId = aiChooseBestMove(movablePawns);
                 await executeMove(bestPawnId);
             } else {
-                // If still no moves, and it's a 6, AI should roll again.
                 if (gameState.diceValue === 6) {
                     gameState.diceRolled = false;
                     setTimeout(executeAITurn, 500);
                 } else {
-                    switchPlayer(); // No moves, not a 6
+                    switchPlayer(); 
                 }
             }
         }
@@ -1214,111 +1228,107 @@ document.addEventListener('DOMContentLoaded', () => {
             const pawn = gameState.pawns[pawnId];
             let score = 0;
             
-            const newPos = (pawn.position === -1) ? 0 : pawn.position + dice; // Relative position
-            if (newPos > TOTAL_PATH_LENGTH) continue; // Should be filtered by findMovablePawns
+            const newPos = (pawn.position === -1) ? 0 : pawn.position + dice; 
+            if (newPos > TOTAL_LOGICAL_PATH_LENGTH) continue; 
 
-            // BASE SCORE: Progress is good
-            score += dice; // Points for moving forward
+            score += dice; 
 
-            // HUGE INCENTIVE: Finishing a pawn
-            if (newPos === TOTAL_PATH_LENGTH) score += 1000;
+            if (newPos === TOTAL_LOGICAL_PATH_LENGTH) score += 1000;
             
-            // INCENTIVE: Getting out of home
             if (pawn.position === -1 && dice === 6) score += 50;
             
-            // Score for moving further along the path
-            if (pawn.position !== -1) score += newPos * 2; // Prioritize pawns already out and moving
+            if (pawn.position !== -1) score += newPos * 2; 
 
-            if (newPos < PATH_LENGTH) { // Considerations for main path
-                const newGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
+            if (newPos < MAIN_PATH_LOGICAL_LENGTH) { 
+                const newGlobalIndex = (newPos + PATH_DATA.START_POSITIONS[pawn.color]) % MAIN_PATH_LOGICAL_LENGTH;
                 
-                // INCENTIVE: Landing on own start square (safe and strategic)
                 if (newGlobalIndex === PATH_DATA.START_POSITIONS[pawn.color]) score += 30;
-                // Minor incentive for other safe squares (less important than own)
                 else if (Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex)) score += 10;
 
-
-                // INCENTIVE: Capturing
                 const opponentsOnSquare = Object.values(gameState.pawns).filter(op => 
                     op.color !== pawn.color && 
-                    op.position !== -1 && !op.isFinished && op.position < PATH_LENGTH &&
+                    op.position !== -1 && !op.isFinished && op.position < MAIN_PATH_LOGICAL_LENGTH &&
                     getGlobalPathIndex(op) === newGlobalIndex);
                 if (opponentsOnSquare.length > 0) {
                     const opponentStackSize = opponentsOnSquare[0].stackSize;
                     if (pawn.stackSize >= opponentStackSize && !Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex)) {
-                         score += 75 * opponentStackSize; // More points for capturing a larger stack
+                         score += 75 * opponentStackSize; 
                     }
                 }
                 
-                // INCENTIVE: Stacking / Creating a blockade
                 const alliesOnSquareAfterMove = Object.values(gameState.pawns).filter(ally => 
-                    ally.id !== pawn.id && // Don't count self before move
+                    ally.id !== pawn.id && 
                     ally.color === pawn.color && 
-                    !ally.isFinished && ally.position !== -1 && ally.position < PATH_LENGTH &&
+                    !ally.isFinished && ally.position !== -1 && ally.position < MAIN_PATH_LOGICAL_LENGTH &&
                     getGlobalPathIndex(ally) === newGlobalIndex
-                ).length + 1; // +1 for the current pawn moving there
+                ).length + 1; 
 
                 if (alliesOnSquareAfterMove > 1 && !Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex)) {
-                    score += 60; // Bonus for creating/joining a stack/blockade
-                    if (alliesOnSquareAfterMove > pawn.stackSize && pawn.stackSize === 1) score += 10; // Extra for joining an existing stack
+                    score += 60; 
+                    if (alliesOnSquareAfterMove > pawn.stackSize && pawn.stackSize === 1) score += 10; 
                 }
 
-                // AVOID DANGER: Check if landing spot is vulnerable to immediate capture
-                // This is a complex calculation, simplified here
                 let dangerScore = 0;
                 for (const otherPlayerColor of gameState.activePlayers) {
-                    if (otherPlayerColor === pawn.color) continue;
+                    if (otherPlayerColor === pawn.color || gameState.winners.includes(otherPlayerColor)) continue;
                     Object.values(gameState.pawns).filter(op => op.color === otherPlayerColor && op.position !== -1 && !op.isFinished).forEach(opponentPawn => {
                         for (let d = 1; d <= 6; d++) {
-                            const opponentPotentialTargetPos = (opponentPawn.position + d + PATH_DATA.START_POSITIONS[opponentPawn.color]) % PATH_LENGTH;
+                            const opponentPotentialTargetPos = (opponentPawn.position + d + PATH_DATA.START_POSITIONS[opponentPawn.color]) % MAIN_PATH_LOGICAL_LENGTH;
                             if (opponentPotentialTargetPos === newGlobalIndex) {
-                                dangerScore -= 30; // Landing in a spot an opponent can reach
-                                if (opponentPawn.stackSize >= alliesOnSquareAfterMove) dangerScore -= 20; // More dangerous if they can capture stack
+                                dangerScore -= 30; 
+                                if (opponentPawn.stackSize >= alliesOnSquareAfterMove) dangerScore -= 20; 
                                 break; 
                             }
                         }
                     });
                 }
                 score += dangerScore;
-            } else if (newPos < TOTAL_PATH_LENGTH) { // On finish path but not finished
-                score += 20; // Bonus for being on finish path
+            } else if (newPos < TOTAL_LOGICAL_PATH_LENGTH) { 
+                score += 20; 
             }
-
 
             if(score > bestMove.score) {
                 bestMove = { pawnId, score };
             }
         }
-        return bestMove.pawnId || movablePawns[0]; // Fallback to first movable if no clear best
+        return bestMove.pawnId || movablePawns[0]; 
     }
     
     // --- Utility Functions ---
     const getGlobalPathIndex = (pawn) => {
-        if (pawn.position === -1 || pawn.position >= PATH_LENGTH) return -1; // Not on main path or at home
-        return (pawn.position + PATH_DATA.START_POSITIONS[pawn.color]) % PATH_LENGTH;
+        if (pawn.position === -1 || pawn.position >= MAIN_PATH_LOGICAL_LENGTH) return -1; 
+        return (pawn.position + PATH_DATA.START_POSITIONS[pawn.color]) % MAIN_PATH_LOGICAL_LENGTH;
     };
 
     function getPawnCoords(pawn, returnGrid = false) {
         const { id, color, position, isFinished } = pawn;
         const cellSize = board.clientWidth / 15;
-        const centerOffset = (cellSize - (parseFloat(getComputedStyle(root).getPropertyValue('--pawn-size')))) / 2;
+        // If cellSize is 0, it means board is not yet sized properly.
+        // Return default or throw error, or handle gracefully. For now, it might lead to NaNs or 0s.
+        if (cellSize === 0) {
+            // console.warn("getPawnCoords called with cellSize 0 for pawn:", pawn.id);
+            return returnGrid ? [0,0] : [0,0]; // Fallback if board not sized
+        }
+        const pawnSizeVal = parseFloat(getComputedStyle(root).getPropertyValue('--pawn-size')); // Actual pawn size in px
+        const centerOffset = (cellSize - pawnSizeVal) / 2;
+
 
         let row, col;
 
-        if (position === -1) { // At home base
-            const homeIndex = parseInt(id.slice(-1)); // 0, 1, 2, or 3
+        if (position === -1) { 
+            const homeIndex = parseInt(id.slice(-1)); 
             [row, col] = PATH_DATA.HOME_SPOTS[color][homeIndex];
-        } else if (isFinished || position === TOTAL_PATH_LENGTH) { // Finished
-            [row, col] = [7, 7]; // Center triangle
-        } else if (position >= PATH_LENGTH) { // On finish path
-            const finishIndex = position - PATH_LENGTH;
+        } else if (isFinished || position === TOTAL_LOGICAL_PATH_LENGTH) { 
+            [row, col] = [7, 7]; 
+        } else if (position >= MAIN_PATH_LOGICAL_LENGTH) { 
+            const finishIndex = position - MAIN_PATH_LOGICAL_LENGTH;
             if (finishIndex < PATH_DATA.FINISH_PATH_COORDS[color].length) {
                 [row, col] = PATH_DATA.FINISH_PATH_COORDS[color][finishIndex];
-            } else { // Should not happen if logic is correct, fallback to center
+            } else { 
                 [row, col] = [7, 7]; 
             }
-        } else { // On main path
-            const pathIndex = (position + PATH_DATA.START_POSITIONS[color]) % PATH_LENGTH;
+        } else { 
+            const pathIndex = (position + PATH_DATA.START_POSITIONS[color]) % MAIN_PATH_LOGICAL_LENGTH;
             [row, col] = PATH_DATA.PATH_COORDS[pathIndex];
         }
 
