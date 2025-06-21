@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galactic Games Arcade</title>
+    <title>Games Arcade</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Roboto:wght@300;400&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
             --primary-glow: #00ffff;
             --secondary-glow: #ff00ff;
             --text-color: #e0e0e0;
-            --card-bg: rgba(26, 26, 46, 0.5);
+            --card-bg: rgba(26, 26, 46, 0.6); /* Slightly more opaque */
             --card-border: rgba(255, 255, 255, 0.1);
             --font-title: 'Orbitron', sans-serif;
             --font-body: 'Roboto', sans-serif;
@@ -83,7 +83,7 @@
 
         header h1 {
             font-family: var(--font-title);
-            font-size: 4em;
+            font-size: clamp(2.5em, 6vw, 4em); /* Responsive font size */
             font-weight: 700;
             margin-bottom: 10px;
             background: linear-gradient(45deg, var(--secondary-glow), var(--primary-glow));
@@ -97,32 +97,37 @@
             font-size: 1.2em;
             color: var(--text-color);
             font-weight: 300;
+            max-width: 60ch; /* Improve readability */
+            margin: 0 auto;
         }
 
+        /* --- IMPROVED RESPONSIVE GRID --- */
         .games-grid {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
+            display: grid;
+            /* Creates a responsive grid that fits as many 300px cards as possible */
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 40px;
-            padding: 20px;
-            max-width: 1200px;
+            padding: 20px 40px; /* More horizontal padding */
+            width: 100%;
+            max-width: 1400px; /* Allow more cards on wider screens */
             margin: 20px auto;
         }
         
+        /* --- IMPROVED CARD STYLING --- */
         .game-card {
             background: var(--card-bg);
             border-radius: 15px;
             border: 1px solid var(--card-border);
             backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px); /* For Safari */
+            -webkit-backdrop-filter: blur(10px);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             overflow: hidden;
-            width: 300px;
             text-decoration: none;
             color: inherit;
             position: relative;
             transform-style: preserve-3d;
             will-change: transform;
+            /* Smoother transitions for multiple properties */
             transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
 
             /* For reveal animation */
@@ -131,33 +136,40 @@
             animation: popIn 0.6s forwards;
         }
 
-        .game-card:nth-child(2) { animation-delay: 0.2s; }
-        .game-card:nth-child(3) { animation-delay: 0.4s; }
-        .game-card:nth-child(4) { animation-delay: 0.6s; } /* Added delay for the new card */
+        .game-card:nth-child(2) { animation-delay: 0.15s; }
+        .game-card:nth-child(3) { animation-delay: 0.3s; }
+        .game-card:nth-child(4) { animation-delay: 0.45s; }
         
-        .game-card::before { /* Animated glowing border */
+        /* --- IMPROVED ANIMATED GLOWING BORDER --- */
+        .game-card::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            inset: 0; /* Replaces top, left, right, bottom */
             border-radius: 15px;
             border: 2px solid transparent;
-            background: linear-gradient(45deg, var(--secondary-glow), var(--primary-glow)) border-box;
-            mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            background: linear-gradient(45deg, var(--secondary-glow), var(--primary-glow), var(--secondary-glow)) border-box;
+            -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
             -webkit-mask-composite: destination-out;
+            mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
             mask-composite: exclude;
             opacity: 0;
             transition: opacity 0.4s ease;
+            /* For the moving glow */
+            background-size: 200% 100%;
         }
         
+        /* --- IMPROVED HOVER STATE --- */
         .game-card:hover {
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5), 0 0 50px rgba(255, 0, 255, 0.5);
+            /* JS will handle the 3D tilt, this provides a "lift" feel */
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 
+                        0 0 30px rgba(0, 255, 255, 0.6), 
+                        0 0 50px rgba(255, 0, 255, 0.6);
         }
 
         .game-card:hover::before {
             opacity: 1;
+            /* Animate the gradient position to make it "move" */
+            animation: moveGlow 3s linear infinite;
         }
 
         .game-card img.thumbnail {
@@ -188,15 +200,22 @@
 
         .game-card .game-info {
             padding: 20px;
-            transform: translateZ(20px); /* Pushes content forward in 3D space */
+            transform: translateZ(20px);
         }
 
+        /* --- IMPROVED TYPOGRAPHY --- */
         .game-card h3 {
             font-family: var(--font-title);
             font-size: 1.7em;
             margin: 0 0 10px;
             color: #ffffff;
             font-weight: 500;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.5); /* Title glow */
+            transition: text-shadow 0.3s ease;
+        }
+
+        .game-card:hover h3 {
+            text-shadow: 0 0 12px var(--primary-glow);
         }
 
         .game-card p {
@@ -204,6 +223,11 @@
             color: var(--text-color);
             line-height: 1.5;
             font-weight: 300;
+            transition: color 0.3s ease; /* Transition for text color */
+        }
+
+        .game-card:hover p {
+            color: #fff; /* Make text pop on hover */
         }
 
         footer {
@@ -217,35 +241,37 @@
 
         /* --- Animations --- */
         @keyframes fadeInDown {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes popIn {
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
+            to { opacity: 1; transform: scale(1); }
         }
 
         @keyframes fadeIn {
             to { opacity: 1; }
         }
         
-        /* --- Responsive Design --- */
+        /* New animation for the moving border glow */
+        @keyframes moveGlow {
+            from { background-position: 200% 0; }
+            to { background-position: -200% 0; }
+        }
+        
+        /* --- Responsive Design Tweaks --- */
         @media (max-width: 768px) {
-            header h1 {
-                font-size: 3em;
+            header p {
+                font-size: 1em;
             }
+        }
+        
+        @media (max-width: 480px) {
             .games-grid {
-                flex-direction: column;
-                align-items: center;
+                padding: 20px 15px; /* Less padding on small screens */
+                gap: 25px; /* Less gap on small screens */
             }
             .game-card {
-                width: 90vw;
-                max-width: 320px;
+                /* The grid's minmax() handles the width, no need to override it here */
             }
         }
     </style>
@@ -256,7 +282,7 @@
     <div class="custom-cursor"></div>
 
     <header>
-        <h1>Galactic Games Arcade</h1>
+        <h1>Games Arcade</h1>
         <p>Choose your adventure from our collection of cosmic challenges!</p>
     </header>
 
@@ -285,7 +311,6 @@
             </div>
         </a>
         
-        <!-- NEW GAME CARD ADDED HERE -->
         <a href="Math.html" class="game-card">
             <img src="math_blaster_thumbnail.png" alt="Math Blaster" class="thumbnail" onerror="handleImageError(this)">
             <div class="game-info">
@@ -296,7 +321,7 @@
     </main>
 
     <footer>
-        <p>© <span id="currentYear"></span> Galactic Games Arcade. All rights reserved.</p>
+        <p>© <span id="currentYear"></span> Games Arcade. All rights reserved.</p>
     </footer>
 
     <script>
@@ -356,15 +381,17 @@
 
                 const centerX = rect.width / 2;
                 const centerY = rect.height / 2;
+                
+                // Adding a translateY(-5px) to the transform to give a lift effect that works with the tilt
+                const rotateX = (y - centerY) / 15; // Increased sensitivity
+                const rotateY = (centerX - x) / 15;
 
-                const rotateX = (y - centerY) / 20; // Lower divisor for more tilt
-                const rotateY = (centerX - x) / 20;
-
-                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                card.style.transform = `perspective(1000px) translateY(-5px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
             });
 
             card.addEventListener('mouseleave', () => {
-                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
+                // Resetting to the base scale from the popIn animation
+                card.style.transform = 'perspective(1000px) scale(1) rotateX(0) rotateY(0)';
             });
         });
         
