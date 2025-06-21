@@ -65,25 +65,52 @@
             position: absolute;
             top: calc(var(--cell-size) * 6); left: calc(var(--cell-size) * 6);
             width: calc(var(--cell-size) * 3); height: calc(var(--cell-size) * 3);
-            /* FIX: Use conic-gradient for correct, non-overlapping triangles matching finish paths */
             background: conic-gradient(
                 from -45deg,
-                var(--blue-color)   0 90deg,  /* Right triangle for Blue's finish path */
-                var(--yellow-color) 90deg 180deg, /* Bottom triangle for Yellow's finish path */
-                var(--green-color)  180deg 270deg, /* Left triangle for Green's finish path */
-                var(--red-color)    270deg 360deg  /* Top triangle for Red's finish path */
+                var(--blue-color)   0 90deg,
+                var(--yellow-color) 90deg 180deg,
+                var(--green-color)  180deg 270deg,
+                var(--red-color)    270deg 360deg
             );
             z-index: 1;
         }
 
         .cell { box-sizing: border-box; }
 
-        .home-base { border: 3px solid #2c3e50; box-shadow: inset 0 0 10px rgba(0,0,0,0.2); }
+        /* --- NEW HOME BASE STYLES --- */
+        .home-base {
+            position: absolute;
+            width: calc(var(--cell-size) * 6);
+            height: calc(var(--cell-size) * 6);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            z-index: 1; /* Above board texture, below pawns */
+            border: 3px solid #2c3e50; 
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
         .red-home-base { background-color: var(--red-home); }
         .green-home-base { background-color: var(--green-home); }
         .yellow-home-base { background-color: var(--yellow-home); }
         .blue-home-base { background-color: var(--blue-home); }
-        .home-spot { border: 2px dashed rgba(0,0,0,0.2); border-radius: 50%; margin: 15%; background-color: rgba(255,255,255,0.2); }
+
+        .home-base-square {
+            box-sizing: border-box;
+            border: 2px solid rgba(44, 62, 80, 0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .home-spot { 
+            width: calc(var(--cell-size) * 1.8);
+            height: calc(var(--cell-size) * 1.8);
+            border: 2px dashed rgba(0,0,0,0.2); 
+            border-radius: 50%; 
+            background-color: rgba(255,255,255,0.2); 
+            box-sizing: border-box;
+        }
+        /* --- END NEW HOME BASE STYLES --- */
 
         .path { background-color: #f5eadd; box-shadow: inset 0 0 8px rgba(0,0,0,0.25); }
         .start {
@@ -280,7 +307,7 @@
             let pawnElements = {};
             const sleep = ms => new Promise(res => setTimeout(res, ms));
 
-            // --- Menu Logic (unchanged) ---
+            // --- Menu Logic ---
             function setupMenu() {
                 mainMenu.style.display = 'flex';
                 gameContainer.style.display = 'none';
@@ -380,6 +407,8 @@
             function createBoardVisuals() {
                 board.innerHTML = '';
                 const allCells = {};
+
+                // Create the 15x15 grid cells (for pathing and pawn placement logic)
                 for (let r = 0; r < 15; r++) { for (let c = 0; c < 15; c++) {
                     const cell = document.createElement('div');
                     cell.className = `cell`;
@@ -387,11 +416,33 @@
                     board.appendChild(cell);
                     allCells[`${r}-${c}`] = cell;
                 }}
-                for (let r = 0; r < 6; r++) { for (let c = 0; c < 6; c++) allCells[`${r}-${c}`].classList.add('red-home-base', 'home-base'); }
-                for (let r = 0; r < 6; r++) { for (let c = 9; c < 15; c++) allCells[`${r}-${c}`].classList.add('green-home-base', 'home-base'); }
-                for (let r = 9; r < 15; r++) { for (let c = 9; c < 15; c++) allCells[`${r}-${c}`].classList.add('yellow-home-base', 'home-base'); }
-                for (let r = 9; r < 15; r++) { for (let c = 0; c < 6; c++) allCells[`${r}-${c}`].classList.add('blue-home-base', 'home-base'); }
 
+                // --- Create visual home base areas ---
+                const homeBaseAreas = {
+                    red:    { top: 0, left: 0, class: 'red-home-base' },
+                    green:  { top: 0, left: 9, class: 'green-home-base' },
+                    yellow: { top: 9, left: 9, class: 'yellow-home-base' },
+                    blue:   { top: 9, left: 0, class: 'blue-home-base' }
+                };
+
+                for (const color in homeBaseAreas) {
+                    const area = homeBaseAreas[color];
+                    const homeBaseEl = document.createElement('div');
+                    homeBaseEl.className = `home-base ${area.class}`;
+                    homeBaseEl.style.top = `calc(var(--cell-size) * ${area.top})`;
+                    homeBaseEl.style.left = `calc(var(--cell-size) * ${area.left})`;
+
+                    // Create the 2x2 squares and the home spot inside each
+                    for (let i = 0; i < 4; i++) {
+                        const square = document.createElement('div');
+                        square.className = 'home-base-square';
+                        square.innerHTML = '<div class="home-spot"></div>';
+                        homeBaseEl.appendChild(square);
+                    }
+                    board.appendChild(homeBaseEl);
+                }
+
+                // Mark the paths on the underlying grid cells
                 PATH_DATA.PATH_COORDS.forEach(([r,c]) => allCells[`${r}-${c}`].classList.add('path'));
                 Object.values(PATH_DATA.FINISH_PATH_COORDS).flat().forEach(([r,c]) => allCells[`${r}-${c}`].classList.add('path'));
 
@@ -401,7 +452,6 @@
                 });
                 
                 Object.entries(PATH_DATA.FINISH_PATH_COORDS).forEach(([color, coords]) => coords.forEach(([r,c]) => allCells[`${r}-${c}`].classList.add('finish-path', color)));
-                Object.values(PATH_DATA.HOME_SPOTS).flat().forEach(([r,c]) => allCells[`${r}-${c}`].innerHTML='<div class="home-spot"></div>');
             }
 
             // --- State Update and Rendering ---
@@ -575,14 +625,16 @@
                 return Object.values(gameState.pawns).filter(pawn => {
                     if (pawn.color !== currentPlayer || pawn.isFinished) return false;
                     
-                    // A pawn in the home base can only move out on a 6
                     if (pawn.position === -1) return dice === 6;
 
-                    // A pawn cannot move past the finish line
                     const newPos = pawn.position + dice;
-                    if (newPos >= PATH_LENGTH + FINISH_PATH_LENGTH) return false;
+                    const finalSquarePosition = PATH_LENGTH + FINISH_PATH_LENGTH - 2; // This is 56
 
-                    // REMOVED: Blockade check. All other moves are considered valid.
+                    // A move is invalid if the new position is beyond the very last square.
+                    if (newPos > finalSquarePosition) {
+                        return false;
+                    }
+
                     return true;
                 }).map(pawn => pawn.id);
             }
@@ -627,7 +679,6 @@
                 const movedGlobalIndex = getGlobalPathIndex(movedPawn.color, movedPawn.position);
                 const isSafeSquare = Object.values(PATH_DATA.START_POSITIONS).includes(movedGlobalIndex);
                 
-                // REMOVED: Blockade check. Now only safe squares prevent capture.
                 if (isSafeSquare) return false;
                 
                 const victims = (gameState.boardState[movedGlobalIndex] || []).filter(id => 
@@ -751,23 +802,19 @@
                     const newPos = (pawn.position === -1) ? 0 : pawn.position + dice;
                     let score = 0;
 
-                    // Highest priority: finishing a pawn
                     if (newPos === PATH_LENGTH + FINISH_PATH_LENGTH - 1) score += 1000;
-                    // Priority: getting a pawn out of home
                     if (pawn.position === -1) score += 50;
-                    // General progress is good
                     score += newPos;
                     
                     if (newPos < PATH_LENGTH) {
                         const newGlobalIndex = getGlobalPathIndex(pawn.color, newPos);
                         const isSafe = Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex);
                         
-                        // REMOVED: Blockade check. AI now checks for captures on any non-safe square.
                         if (!isSafe) {
                             const opponentOnSquare = (gameState.boardState[newGlobalIndex] || []).some(id => gameState.pawns[id].color !== pawn.color);
-                            if (opponentOnSquare) score += 75; // High value on capturing
+                            if (opponentOnSquare) score += 75;
                         }
-                        if (isSafe) score += 20; // Bonus for landing on a safe square
+                        if (isSafe) score += 20;
                     }
                     
                     if(score > bestMove.score) bestMove = { pawnId, score };
