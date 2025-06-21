@@ -9,8 +9,8 @@
             --board-size: clamp(320px, 90vmin, 650px);
             --cell-size: calc(var(--board-size) / 15);
             --pawn-size: calc(var(--cell-size) * 0.7);
-            /* --- CHANGE: Slightly faster hop for a snappier feel --- */
-            --hop-duration: 0.15s;
+            /* --- CHANGE: Pawn hop slowed down to 0.5 seconds --- */
+            --hop-duration: 0.5s;
 
             --red-color: #d63031;
             --green-color: #00b894;
@@ -232,12 +232,16 @@
         @keyframes pulse-glow {}
 
         @keyframes roll-dice-animation {
-            0% { transform: scale(1.2) rotate3d(0, 0, 0, 0deg); }
-            20% { transform: scale(1.2) rotate3d(0.5, 0.8, 0.1, 100deg); }
-            40% { transform: scale(1.2) rotate3d(0.1, 0.2, 0.7, 200deg); }
-            60% { transform: scale(1.2) rotate3d(0.9, 0.1, 0.3, 300deg); }
-            80% { transform: scale(1.2) rotate3d(0.7, 0.3, 0.8, 400deg); }
-            100% { transform: scale(1) rotate3d(0, 0, 0, 0deg); }
+            /* --- CHANGE: Simplified animation to use only rotate() and scale() for better performance on mobile devices. Removed complex rotate3d(). --- */
+            0% {
+                transform: scale(1.1) rotate(0deg);
+            }
+            50% {
+                transform: scale(1.3) rotate(180deg);
+            }
+            100% {
+                transform: scale(1) rotate(360deg);
+            }
         }
         @keyframes jiggle {
             0%, 100% { transform: scale(1) rotate(0deg); }
@@ -670,7 +674,8 @@
                 const pawnEl = pawnElements[pawnId];
                 const startPos = pawn.position;
                 const dice = gameState.diceValue;
-                const hopDelay = 150; // JS delay should match CSS transition duration
+                // --- CHANGE: JS delay increased to match the new, slower CSS transition duration
+                const hopDelay = 500; // JS delay should match CSS transition duration
 
                 // Sound playback logic
                 const playHopSound = () => {
