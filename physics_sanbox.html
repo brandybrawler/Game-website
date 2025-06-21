@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Physics Sandbox - Mobile & Gyro</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            font-family: 'Arial', sans-serif;
+            cursor: grab;
+        }
+        
+        body.dragging {
+            cursor: grabbing;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 100;
+            color: #ffffff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 16px;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            color: #ffffff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 95vw;
+        }
+        
+        #control-text {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        button {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px 16px;
+            margin: 5px;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            z-index: 200;
+        }
+        
+        .fade-out {
+            opacity: 0;
+            transition: opacity 1s ease-out;
+        }
+
+        @media (max-width: 768px) {
+            #ui {
+                padding: 10px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="loading">Loading Physics Engine...</div>
+        
+        <div id="ui">
+            <h3>🚀 3D Physics Sandbox</h3>
+            <div>Objects: <span id="objectCount">0</span></div>
+            <div>FPS: <span id="fps">60</span></div>
+        </div>
+        
+        <div id="controls">
+            <div id="control-text">
+                <strong>Controls:</strong><br>
+                <span class="desktop-only">🖱️ L-Click & Drag - Move objects</span>
+                <span class="mobile-only" style="display:none;">👆 Tap & Drag - Move objects</span><br>
+                <span class="desktop-only">🖱️ R-Click & Drag - Rotate</span>
+                <span class="mobile-only" style="display:none;">👆 Drag BG - Rotate | Pinch - Zoom</span><br>
+                <span>⚡ Space/Button - Add | 🗑️ R/Button - Reset</span>
+            </div>
+            <button onclick="addRandomObject()">Add Object</button>
+            <button onclick="resetScene()">Reset</button>
+            <button id="gravityToggleButton" onclick="toggleGravity()">Toggle Gravity</button>
+            <button id="gyroButton" onclick="toggleGyroGravity()">Enable Gyro Gravity</button>
+            <button onclick="document.getElementById('fileInput').click()">Import Model</button>
+            <input type="file" id="fileInput" accept=".obj,.fbx" style="display: none;">
+        </div>
+    </div>
+
+    <!-- Core Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    
+    <!-- 
+      *** CRITICAL SCRIPT ORDER ***
+      The fflate library MUST be loaded BEFORE FBXLoader.js
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fflate/umd/fflate.min.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+    
+    <script>
+        // Game variables
+        let scene, camera, renderer, world;
+        let objects = [];
+        let fbxLoader, objLoader;
+
+        // State variables
+        let isDragging = false;
+        let dragObject = null;
+        let dragConstraint = null;
+        let gravityEnabled = true;
+        let gyroGravityEnabled = false;
+
+        // Control variables
+        let mouse = new THREE.Vector2();
+        let raycaster = new THREE.Raycaster();
+        let isTouching = false;
+        let isRotatingCamera = false;
+        let initialPinchDistance = 0;
+        let lastTouch = { x: 0, y: 0 };
+        
+        // Performance variables
+        let frameCount = 0;
+        let lastTime = 0;
+        
+        function init() {
+            setupScene();
+            setupPhysics();
+            createLights();
+            createGround();
+            setupLoaders();
+            
+            for (let i = 0; i < 5; i++) {
+                addRandomObject();
+            }
+            
+            addEventListeners();
+            updateControlInstructions();
+            
+            document.getElementById('loading').classList.add('fade-out');
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 1000);
+            
+            animate();
+        }
+
+        function setupScene() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.Fog(0x0f0f23, 50, 200);
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 20);
+            camera.lookAt(0, 0, 0);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x0f0f23, 0.8);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+            document.getElementById('gameContainer').appendChild(renderer.domElement);
+        }
+
+        function setupPhysics() {
+            world = new CANNON.World();
+            world.gravity.set(0, -20, 0);
+            world.broadphase = new CANNON.NaiveBroadphase();
+            world.solver.iterations = 10;
+        }
+
+        function setupLoaders() {
+            fbxLoader = new THREE.FBXLoader();
+            objLoader = new THREE.OBJLoader();
+        }
+        
+        function createLights() {
+            scene.add(new THREE.AmbientLight(0x404040, 0.8));
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            directionalLight.position.set(50, 100, 50);
+            directionalLight.castShadow = true;
+            // Lower shadow map size for better mobile performance
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 200;
+            directionalLight.shadow.camera.left = -50;
+            directionalLight.shadow.camera.right = 50;
+            directionalLight.shadow.camera.top = 50;
+            directionalLight.shadow.camera.bottom = -50;
+            scene.add(directionalLight);
+            
+            const pointLight1 = new THREE.PointLight(0x667eea, 0.7, 100);
+            pointLight1.position.set(-20, 15, -20);
+            scene.add(pointLight1);
+            
+            const pointLight2 = new THREE.PointLight(0x764ba2, 0.7, 100);
+            pointLight2.position.set(20, 15, 20);
+            scene.add(pointLight2);
+        }
+        
+        function createGround() {
+            const groundGeometry = new THREE.PlaneGeometry(200, 200);
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+            const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+            groundMesh.rotation.x = -Math.PI / 2;
+            groundMesh.receiveShadow = true;
+            scene.add(groundMesh);
+            
+            const groundShape = new CANNON.Plane();
+            const groundBody = new CANNON.Body({ mass: 0, material: new CANNON.Material({ friction: 0.3, restitution: 0.3 }) });
+            groundBody.addShape(groundShape);
+            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+            world.add(groundBody);
+        }
+        
+        function addRandomObject() {
+            const objectTypes = ['box', 'sphere', 'cylinder'];
+            const type = objectTypes[Math.floor(Math.random() * objectTypes.length)];
+            const colors = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xf39c12, 0x9b59b6, 0xe67e22];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            
+            let mesh, body;
+            const mass = 1;
+            const position = new THREE.Vector3(
+                (Math.random() - 0.5) * 20,
+                Math.random() * 10 + 15,
+                (Math.random() - 0.5) * 20
+            );
+            
+            if (type === 'box') {
+                const size = Math.random() * 2 + 1;
+                mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), new THREE.MeshPhongMaterial({ color }));
+                body = new CANNON.Body({ mass, shape: new CANNON.Box(new CANNON.Vec3(size/2, size/2, size/2)) });
+            } else if (type === 'sphere') {
+                const radius = Math.random() * 1.5 + 0.5;
+                mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 20, 20), new THREE.MeshPhongMaterial({ color }));
+                body = new CANNON.Body({ mass, shape: new CANNON.Sphere(radius) });
+            } else { // Cylinder
+                const radius = Math.random() * 1 + 0.5;
+                const height = Math.random() * 3 + 1;
+                mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 16), new THREE.MeshPhongMaterial({ color }));
+                const shape = new CANNON.Cylinder(radius, radius, height, 16);
+                body = new CANNON.Body({ mass });
+                const quat = new CANNON.Quaternion().setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
+                body.addShape(shape, new CANNON.Vec3(), quat.inverse());
+            }
+            
+            mesh.position.copy(position);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            
+            body.position.copy(position);
+            body.material = new CANNON.Material({ friction: 0.4, restitution: 0.6 });
+            world.add(body);
+            
+            objects.push({ mesh, body, type });
+            updateObjectCount();
+        }
+        
+        function addModelToScene(model) {
+            const box = new THREE.Box3().setFromObject(model);
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 4 / maxDim;
+            model.scale.setScalar(scale);
+
+            model.traverse(child => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            const body = new CANNON.Body({ mass: 5, material: new CANNON.Material({ friction: 0.5, restitution: 0.3 }) });
+            let shapeGenerated = false;
+
+            model.traverse(child => {
+                if (!child.isMesh || !child.geometry.attributes.position || child.geometry.attributes.position.count === 0) return;
+                
+                const scaledVertices = [];
+                const positions = child.geometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                     scaledVertices.push(new CANNON.Vec3(positions[i] * scale, positions[i+1] * scale, positions[i+2] * scale));
+                }
+                
+                if (scaledVertices.length < 4) return;
+
+                const convexShape = new CANNON.ConvexPolyhedron({ vertices: scaledVertices });
+                const shapeOffset = child.position.clone().multiplyScalar(scale);
+                const shapeQuat = child.quaternion.clone();
+                body.addShape(convexShape, new CANNON.Vec3().copy(shapeOffset), new CANNON.Quaternion().copy(shapeQuat));
+                shapeGenerated = true;
+            });
+
+            if (!shapeGenerated) {
+                console.warn("Could not generate any valid convex hull, falling back to box shape.");
+                const fallbackBox = new THREE.Box3().setFromObject(model);
+                const fallbackSize = fallbackBox.getSize(new THREE.Vector3());
+                body.addShape(new CANNON.Box(new CANNON.Vec3(fallbackSize.x / 2, fallbackSize.y / 2, fallbackSize.z / 2)));
+            }
+
+            const initialPosition = new THREE.Vector3((Math.random() - 0.5) * 10, 15, (Math.random() - 0.5) * 10);
+            body.position.copy(initialPosition);
+            model.position.copy(initialPosition);
+
+            scene.add(model);
+            world.addBody(body);
+            objects.push({ mesh: model, body: body, type: 'imported' });
+            updateObjectCount();
+        }
+        
+        function addEventListeners() {
+            // Mouse Events for Desktop
+            renderer.domElement.addEventListener('mousedown', onMouseDown, false);
+            renderer.domElement.addEventListener('mousemove', onMouseMove, false);
+            renderer.domElement.addEventListener('mouseup', onMouseUp, false);
+            renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault(), false);
+
+            // Touch Events for Mobile
+            renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+            renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+            
+            // General Events
+            document.addEventListener('keydown', onKeyDown, false);
+            window.addEventListener('resize', onWindowResize, false);
+            document.getElementById('fileInput').addEventListener('change', (e) => handleFileImport(e), false);
+        }
+        
+        // --- Drag Logic ---
+        function startDrag(intersection) {
+            isDragging = true;
+            document.body.classList.add('dragging');
+            
+            let intersectedMesh = intersection.object;
+            // Find the top-level parent object, which is what we store in our `objects` array
+            let topLevelObject = intersectedMesh;
+            while (topLevelObject.parent && topLevelObject.parent !== scene) {
+                topLevelObject = topLevelObject.parent;
+            }
+            dragObject = objects.find(obj => obj.mesh === topLevelObject);
+
+            if (!dragObject) { isDragging = false; return; }
+            
+            const dragBody = new CANNON.Body({ mass: 0 });
+            dragBody.addShape(new CANNON.Sphere(0.1));
+            dragBody.position.copy(intersection.point);
+            world.add(dragBody);
+            
+            dragConstraint = new CANNON.PointToPointConstraint(
+                dragObject.body,
+                new CANNON.Vec3().copy(intersection.point).vsub(dragObject.body.position),
+                dragBody,
+                new CANNON.Vec3()
+            );
+            world.addConstraint(dragConstraint);
+            dragObject.dragBody = dragBody; // Store reference for moving
+        }
+
+        function moveDragObject() {
+            if (!dragObject) return;
+            raycaster.setFromCamera(mouse, camera);
+            const distance = dragObject.body.position.distanceTo(camera.position);
+            const newPosition = raycaster.ray.at(distance, new THREE.Vector3());
+            dragObject.dragBody.position.copy(newPosition);
+        }
+
+        function endDrag() {
+            if (dragConstraint) world.removeConstraint(dragConstraint);
+            if (dragObject && dragObject.dragBody) world.remove(dragObject.dragBody);
+            dragConstraint = null;
+            if (dragObject) dragObject.dragBody = null;
+            dragObject = null;
+            isDragging = false;
+            document.body.classList.remove('dragging');
+        }
+
+        // --- Mouse Handlers ---
+        function onMouseDown(event) {
+            if (event.button !== 0 || isTouching) return; // Only left-click, ignore if touch is active
+            
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(objects.map(obj => obj.mesh), true);
+            
+            if (intersects.length > 0) {
+                startDrag(intersects[0]);
+            }
+        }
+        
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            if (isDragging) {
+                moveDragObject();
+            } else if (event.buttons === 2) { // Right mouse button for camera rotation
+                const sensitivity = 0.01;
+                camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), -event.movementX * sensitivity);
+                camera.position.y += event.movementY * sensitivity * 0.5;
+                camera.position.y = Math.max(1, camera.position.y);
+                camera.lookAt(0, 0, 0);
+            }
+        }
+        
+        function onMouseUp(event) {
+            if (event.button === 0) endDrag();
+        }
+
+        // --- Touch Handlers ---
+        function onTouchStart(event) {
+            event.preventDefault();
+            isTouching = true;
+            const touch = event.touches[0];
+            
+            mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+            
+            if (event.touches.length === 1) {
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(objects.map(obj => obj.mesh), true);
+                if (intersects.length > 0) {
+                    isRotatingCamera = false;
+                    startDrag(intersects[0]);
+                } else {
+                    isRotatingCamera = true;
+                    lastTouch.x = touch.clientX;
+                    lastTouch.y = touch.clientY;
+                }
+            } else if (event.touches.length === 2) {
+                isRotatingCamera = false;
+                const dx = event.touches[0].clientX - event.touches[1].clientX;
+                const dy = event.touches[0].clientY - event.touches[1].clientY;
+                initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
+            }
+        }
+
+        function onTouchMove(event) {
+            event.preventDefault();
+            if (!isTouching) return;
+            const touch = event.touches[0];
+
+            mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+
+            if (event.touches.length === 1) {
+                if (isDragging) {
+                    moveDragObject();
+                } else if (isRotatingCamera) {
+                    const dx = touch.clientX - lastTouch.x;
+                    const dy = touch.clientY - lastTouch.y;
+                    const sensitivity = 0.01;
+                    camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), -dx * sensitivity);
+                    camera.position.y += dy * sensitivity * 0.5;
+                    camera.position.y = Math.max(1, camera.position.y);
+                    camera.lookAt(0, 0, 0);
+                    lastTouch.x = touch.clientX;
+                    lastTouch.y = touch.clientY;
+                }
+            } else if (event.touches.length === 2) {
+                const dx = event.touches[0].clientX - event.touches[1].clientX;
+                const dy = event.touches[0].clientY - event.touches[1].clientY;
+                const currentPinchDistance = Math.sqrt(dx * dx + dy * dy);
+                const zoomFactor = initialPinchDistance / currentPinchDistance;
+                
+                const dist = camera.position.length();
+                const newDist = Math.max(5, Math.min(100, dist * zoomFactor));
+                camera.position.setLength(newDist);
+                initialPinchDistance = currentPinchDistance;
+            }
+        }
+
+        function onTouchEnd(event) {
+            endDrag();
+            isRotatingCamera = false;
+            initialPinchDistance = 0;
+            if (event.touches.length === 0) {
+                isTouching = false;
+            }
+        }
+        
+        // --- Core Functions ---
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'Space': event.preventDefault(); addRandomObject(); break;
+                case 'KeyR': resetScene(); break;
+                case 'KeyG': toggleGravity(); break;
+            }
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        function resetScene() {
+            while (objects.length > 0) {
+                const obj = objects.pop();
+                scene.remove(obj.mesh);
+                if (obj.body) world.removeBody(obj.body);
+            }
+            for (let i = 0; i < 5; i++) {
+                addRandomObject();
+            }
+            updateObjectCount();
+        }
+        
+        function toggleGravity() {
+            if (gyroGravityEnabled) return;
+            gravityEnabled = !gravityEnabled;
+            world.gravity.set(0, gravityEnabled ? -20 : 0, 0);
+            world.bodies.forEach(body => { if (body.mass > 0) body.wakeUp(); });
+        }
+        
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            const loader = (fileExt === 'fbx') ? fbxLoader : (fileExt === 'obj') ? objLoader : null;
+            if (loader) {
+                loader.load(url, (model) => {
+                    addModelToScene(model);
+                    URL.revokeObjectURL(url);
+                }, undefined, (error) => {
+                    console.error('An error happened during loading:', error);
+                    alert('Failed to load model. Check console for details.');
+                });
+            } else {
+                alert('Unsupported file format. Please use .fbx or .obj');
+            }
+            event.target.value = '';
+        }
+
+        // --- Gyroscope Functions ---
+        function toggleGyroGravity() {
+            const gyroButton = document.getElementById('gyroButton');
+            if (!gyroGravityEnabled) {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(state => {
+                            if (state === 'granted') {
+                                window.addEventListener('deviceorientation', handleOrientation);
+                                enableGyroMode();
+                            } else { alert('Permission for device orientation was denied.'); }
+                        }).catch(console.error);
+                } else {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                    enableGyroMode();
+                }
+            } else {
+                disableGyroMode();
+            }
+        }
+
+        function enableGyroMode() {
+            gyroGravityEnabled = true;
+            document.getElementById('gravityToggleButton').disabled = true;
+            const gyroButton = document.getElementById('gyroButton');
+            gyroButton.textContent = 'Disable Gyro';
+            gyroButton.style.background = 'linear-gradient(45deg, #e53935 0%, #e35d5b 100%)';
+        }
+
+        function disableGyroMode() {
+            gyroGravityEnabled = false;
+            window.removeEventListener('deviceorientation', handleOrientation);
+            world.gravity.set(0, gravityEnabled ? -20 : 0, 0); // Restore normal gravity
+            document.getElementById('gravityToggleButton').disabled = false;
+            const gyroButton = document.getElementById('gyroButton');
+            gyroButton.textContent = 'Enable Gyro Gravity';
+            gyroButton.style.background = 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)';
+        }
+
+        function handleOrientation(event) {
+            if (!gyroGravityEnabled) return;
+            const g = 20; // Gravity strength
+            const beta = event.beta;  // Front/back tilt [-180, 180]
+            const gamma = event.gamma; // Left/right tilt [-90, 90]
+
+            world.gravity.x = (gamma / 90) * g;
+            world.gravity.z = (beta / 90) * g;
+            world.gravity.y = -Math.abs(g * 0.25); // Always have some downward pull
+
+            world.bodies.forEach(body => { if (body.mass > 0) body.wakeUp(); });
+        }
+
+        // --- UI & Utility Functions ---
+        function updateObjectCount() {
+            document.getElementById('objectCount').textContent = objects.length;
+        }
+        
+        function updateFPS() {
+            const now = performance.now();
+            frameCount++;
+            if (lastTime === 0) lastTime = now;
+            if (now - lastTime >= 1000) {
+                document.getElementById('fps').textContent = Math.round((frameCount * 1000) / (now - lastTime));
+                frameCount = 0;
+                lastTime = now;
+            }
+        }
+
+        function updateControlInstructions() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile) {
+                document.querySelectorAll('.desktop-only').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'inline');
+                document.getElementById('gyroButton').style.display = 'inline-block';
+            } else {
+                document.getElementById('gyroButton').style.display = 'none';
+            }
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            world.step(1/60);
+            
+            objects.forEach(obj => {
+                if (obj.mesh && obj.body) {
+                    obj.mesh.position.copy(obj.body.position);
+                    obj.mesh.quaternion.copy(obj.body.quaternion);
+                }
+            });
+            
+            renderer.render(scene, camera);
+            updateFPS();
+        }
+        
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
