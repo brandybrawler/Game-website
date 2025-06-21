@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Number Blast - Math Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .score, .level, .time {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .equation-display {
+            text-align: center;
+            font-size: 48px;
+            font-weight: bold;
+            padding: 30px;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .game-area {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cannon {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(145deg, #ff6b6b, #ee5a52);
+            border-radius: 50%;
+            border: 4px solid #fff;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            cursor: crosshair;
+            transition: all 0.2s;
+            z-index: 50;
+        }
+
+        .cannon:hover {
+            transform: translateX(-50%) scale(1.1);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+        }
+
+        .cannon::before {
+            content: '🚀';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 32px;
+        }
+
+        .cannon-barrel {
+            position: absolute;
+            bottom: 100px; /* This is the pivot point for rotation */
+            left: 50%;
+            width: 8px;
+            height: 40px;
+            background: linear-gradient(to top, #333, #666);
+            border-radius: 4px;
+            transform-origin: bottom center;
+            transition: transform 0.1s;
+            z-index: 49;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .projectile {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #feca57, #ff9ff3);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(254, 202, 87, 0.8);
+            z-index: 40;
+            animation: projectile-glow 0.5s infinite alternate;
+        }
+
+        @keyframes projectile-glow {
+            0% { box-shadow: 0 0 20px rgba(254, 202, 87, 0.8); }
+            100% { box-shadow: 0 0 30px rgba(254, 202, 87, 1), 0 0 40px rgba(255, 159, 243, 0.5); }
+        }
+
+        .crosshair {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 2px solid #feca57;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 60;
+            opacity: 0.8;
+            animation: crosshair-pulse 1s infinite;
+            display: none; /* Hidden by default, shown for mouse users */
+        }
+        
+        @media (pointer: fine) { /* Show crosshair only on devices with fine pointers (mice) */
+             .crosshair {
+                display: block;
+             }
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: #feca57;
+            box-shadow: 0 0 10px rgba(254, 202, 87, 0.8);
+        }
+
+        .crosshair::before {
+            width: 20px;
+            height: 2px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .crosshair::after {
+            width: 2px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes crosshair-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        .number-bubble {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: all 0.3s;
+            animation: float 3s ease-in-out infinite;
+            border: 3px solid rgba(255,255,255,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .number-bubble:hover {
+            transform: scale(1.2);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            25% { transform: translateY(-10px) rotate(5deg); }
+            75% { transform: translateY(5px) rotate(-5deg); }
+        }
+
+        .explosion {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            pointer-events: none;
+            animation: explode 0.6s ease-out forwards;
+        }
+
+        @keyframes explode {
+            0% {
+                transform: scale(0) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2) rotate(180deg);
+                opacity: 0;
+            }
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 200;
+            display: none;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .game-over h2 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #ff6b6b;
+        }
+
+        .restart-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        .restart-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #feca57;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particle-fall 2s linear forwards;
+        }
+
+        @keyframes particle-fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .combo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: bold;
+            color: #feca57;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+            animation: combo-popup 1s ease-out forwards;
+        }
+
+        @keyframes combo-popup {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 1;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+            100% {
+                transform: translate(-50%, -60%) scale(1);
+                opacity: 0;
+            }
+        }
+        
+        /* --- Responsive Design for Mobile Devices --- */
+        @media (max-width: 768px) {
+            .score, .level, .time {
+                font-size: 18px;
+            }
+            .header {
+                padding: 15px;
+            }
+            .equation-display {
+                font-size: 36px;
+                padding: 15px;
+            }
+            .number-bubble {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+            .cannon {
+                width: 60px;
+                height: 60px;
+                bottom: 10px;
+            }
+            .cannon::before {
+                font-size: 24px;
+            }
+            .cannon-barrel {
+                height: 30px;
+                bottom: 70px; /* Adjust barrel pivot for smaller cannon */
+            }
+            .game-over h2 {
+                font-size: 36px;
+            }
+            .restart-btn {
+                padding: 12px 24px;
+                font-size: 18px;
+            }
+        }
+
+        @media (max-height: 600px) {
+             .header {
+                padding: 10px;
+            }
+            .equation-display {
+                font-size: 32px;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <div class="score">Score: <span id="score">0</span></div>
+            <div class="level">Level: <span id="level">1</span></div>
+            <div class="time">Time: <span id="time">60</span>s</div>
+        </div>
+        
+        <div class="equation-display" id="equation"></div>
+        
+        <div class="game-area" id="gameArea"></div>
+        
+        <div class="game-over" id="gameOver">
+            <h2>Game Over!</h2>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <p>Level Reached: <span id="finalLevel">1</span></p>
+            <button class="restart-btn" onclick="startGame()">Play Again</button>
+        </div>
+        <div class="crosshair" id="crosshair"></div>
+    </div>
+
+    <script>
+        let gameState = {};
+        let gameTimer = null;
+        let animationFrameId = null;
+
+        const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+        
+        function getRandomColor() {
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        function generateEquation() {
+            const operations = ['+', '-', '×', '÷'];
+            let operationIndex = Math.floor(Math.random() * operations.length);
+            if (gameState.level < 3 && (operations[operationIndex] === '×' || operations[operationIndex] === '÷')) {
+                operationIndex = Math.floor(Math.random() * 2); // Force + or -
+            }
+            const operation = operations[operationIndex];
+            let num1, num2, answer;
+
+            switch(operation) {
+                case '+':
+                    num1 = Math.floor(Math.random() * (10 + gameState.level * 5)) + 1;
+                    num2 = Math.floor(Math.random() * (10 + gameState.level * 5)) + 1;
+                    answer = num1 + num2;
+                    break;
+                case '-':
+                    num1 = Math.floor(Math.random() * (15 + gameState.level * 5)) + 10;
+                    num2 = Math.floor(Math.random() * num1) + 1;
+                    answer = num1 - num2;
+                    break;
+                case '×':
+                    num1 = Math.floor(Math.random() * (5 + Math.floor(gameState.level / 2))) + 2;
+                    num2 = Math.floor(Math.random() * (5 + Math.floor(gameState.level / 2))) + 2;
+                    answer = num1 * num2;
+                    break;
+                case '÷':
+                    answer = Math.floor(Math.random() * (8 + gameState.level)) + 2;
+                    num2 = Math.floor(Math.random() * 5) + 2;
+                    num1 = answer * num2;
+                    break;
+            }
+
+            gameState.currentAnswer = answer;
+            return `${num1} ${operation} ${num2} = ?`;
+        }
+
+        function createBubble() {
+            const bubbleEl = document.createElement('div');
+            bubbleEl.className = 'number-bubble';
+            const isMobile = window.innerWidth <= 768;
+            const bubbleSize = isMobile ? 50 : 60;
+            
+            let number;
+            if (Math.random() < 0.35 + (gameState.level * 0.01)) { 
+                number = gameState.currentAnswer;
+            } else {
+                const offset = gameState.currentAnswer + 20;
+                number = Math.floor(Math.random() * offset) + Math.max(1, gameState.currentAnswer - 10);
+                while (number === gameState.currentAnswer) {
+                    number = Math.floor(Math.random() * offset) + 1;
+                }
+            }
+            
+            bubbleEl.textContent = number;
+            bubbleEl.style.background = `linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()})`;
+            bubbleEl.style.left = Math.random() * (window.innerWidth - bubbleSize) + 'px';
+            bubbleEl.style.top = `-${bubbleSize}px`;
+            
+            document.getElementById('gameArea').appendChild(bubbleEl);
+            const bubbleData = {
+                element: bubbleEl, 
+                number: number, 
+                y: -bubbleSize, 
+                x: parseFloat(bubbleEl.style.left),
+                radius: bubbleSize / 2
+            };
+            gameState.bubbles.push(bubbleData);
+        }
+        
+        function getCannonPivot() {
+            const isMobile = window.innerWidth <= 768;
+            const yOffset = isMobile ? 70 : 100;
+            return {
+                x: window.innerWidth / 2,
+                y: window.innerHeight - yOffset
+            };
+        }
+
+        function createProjectile(targetX, targetY) {
+            const pivot = getCannonPivot();
+            const startX = pivot.x - 10; // Center projectile on barrel
+            const startY = pivot.y - 20; // Start at barrel tip
+            
+            const projectile = document.createElement('div');
+            projectile.className = 'projectile';
+            projectile.style.left = startX + 'px';
+            projectile.style.top = startY + 'px';
+            
+            document.getElementById('gameArea').appendChild(projectile);
+            
+            const angle = Math.atan2(targetY - pivot.y, targetX - pivot.x);
+            const speed = 15;
+            
+            const deltaX = Math.cos(angle) * speed;
+            const deltaY = Math.sin(angle) * speed;
+            
+            gameState.projectiles.push({
+                element: projectile, x: startX, y: startY, deltaX, deltaY, radius: 10
+            });
+            
+            createMuzzleFlash(pivot.x, pivot.y);
+        }
+
+        function createMuzzleFlash(x, y) {
+            const flash = document.createElement('div');
+            flash.style.position = 'absolute';
+            flash.style.left = x - 15 + 'px';
+            flash.style.top = y - 15 + 'px';
+            flash.style.width = '30px';
+            flash.style.height = '30px';
+            flash.style.background = 'radial-gradient(circle, #fff, #feca57, transparent)';
+            flash.style.borderRadius = '50%';
+            flash.style.animation = 'explode 0.3s ease-out forwards';
+            flash.style.pointerEvents = 'none';
+            flash.style.zIndex = '45';
+            document.getElementById('gameArea').appendChild(flash);
+            setTimeout(() => flash.remove(), 300);
+        }
+
+        function updateProjectiles() {
+            for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
+                const p = gameState.projectiles[i];
+                p.x += p.deltaX;
+                p.y += p.deltaY;
+                
+                p.element.style.left = p.x + 'px';
+                p.element.style.top = p.y + 'px';
+                
+                let hit = false;
+                for (let j = gameState.bubbles.length - 1; j >= 0; j--) {
+                    const b = gameState.bubbles[j];
+                    const dist = Math.hypot( (p.x + p.radius) - (b.x + b.radius), (p.y + p.radius) - (b.y + b.radius) );
+                    if (dist < p.radius + b.radius) {
+                        hitBubble(b, j);
+                        hit = true;
+                        break;
+                    }
+                }
+                
+                // Remove projectile if it hit something or goes way off-screen
+                if (hit || p.y < -50 || p.y > window.innerHeight + 50 || p.x < -50 || p.x > window.innerWidth + 50) {
+                    p.element.remove();
+                    gameState.projectiles.splice(i, 1);
+                }
+            }
+        }
+
+        function hitBubble(bubble, bubbleIndex) {
+            if (bubble.element.dataset.hit) return; // Prevent double hits
+            bubble.element.dataset.hit = true;
+
+            if (bubble.number === gameState.currentAnswer) {
+                gameState.score += 10 + (gameState.combo * 5);
+                gameState.combo++;
+                if (gameState.combo > 1) showCombo();
+                createExplosion(bubble.element, '#4ecdc4');
+                createParticles(bubble.element);
+                document.getElementById('equation').textContent = generateEquation();
+                if (gameState.score >= gameState.level * 100) {
+                    gameState.level++;
+                    gameState.bubbleSpeed += 0.2;
+                    gameState.timeLeft += 10;
+                }
+            } else {
+                gameState.combo = 0;
+                gameState.timeLeft = Math.max(0, gameState.timeLeft - 3);
+                createExplosion(bubble.element, '#ff6b6b');
+            }
+            
+            bubble.element.remove();
+            gameState.bubbles.splice(bubbleIndex, 1);
+            updateUI();
+        }
+
+        function updateCannonAiming(mouseX, mouseY) {
+            const cannonBarrel = document.getElementById('cannonBarrel');
+            if (!cannonBarrel) return;
+            
+            const pivot = getCannonPivot();
+            const angle = Math.atan2(mouseY - pivot.y, mouseX - pivot.x) + Math.PI / 2;
+            const degrees = angle * (180 / Math.PI);
+            cannonBarrel.style.transform = `translateX(-50%) rotate(${degrees}deg)`;
+            
+            const crosshair = document.getElementById('crosshair');
+            if (crosshair) {
+                crosshair.style.left = mouseX - 15 + 'px';
+                crosshair.style.top = mouseY - 15 + 'px';
+            }
+        }
+
+        function createExplosion(bubbleEl, color) {
+            const explosion = document.createElement('div');
+            explosion.className = 'explosion';
+            explosion.style.left = bubbleEl.style.left;
+            explosion.style.top = bubbleEl.style.top;
+            explosion.style.background = `radial-gradient(circle, ${color}, transparent)`;
+            explosion.innerHTML = '💥';
+            explosion.style.fontSize = '48px';
+            explosion.style.display = 'flex';
+            explosion.style.alignItems = 'center';
+            explosion.style.justifyContent = 'center';
+            document.getElementById('gameArea').appendChild(explosion);
+            setTimeout(() => explosion.remove(), 600);
+        }
+
+        function createParticles(bubbleEl) {
+            const rect = bubbleEl.getBoundingClientRect();
+            for (let i = 0; i < 8; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = rect.left + rect.width / 2 + 'px';
+                particle.style.top = rect.top + rect.height / 2 + 'px';
+                particle.style.background = getRandomColor();
+                document.body.appendChild(particle);
+                setTimeout(() => particle.remove(), 2000);
+            }
+        }
+
+        function showCombo() {
+            const combo = document.createElement('div');
+            combo.className = 'combo';
+            combo.textContent = `${gameState.combo}x COMBO!`;
+            document.getElementById('gameArea').appendChild(combo);
+            setTimeout(() => combo.remove(), 1000);
+        }
+
+        function updateBubbles() {
+            for (let i = gameState.bubbles.length - 1; i >= 0; i--) {
+                const bubble = gameState.bubbles[i];
+                bubble.y += gameState.bubbleSpeed;
+                bubble.element.style.top = bubble.y + 'px';
+                
+                if (bubble.y > window.innerHeight) {
+                    bubble.element.remove();
+                    gameState.bubbles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('time').textContent = gameState.timeLeft;
+        }
+
+        function gameLoop() {
+            if (!gameState.gameRunning) return;
+            updateBubbles();
+            updateProjectiles();
+            if (Math.random() < 0.02 + (gameState.level * 0.005)) {
+                createBubble();
+            }
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function startTimer() {
+            if (gameTimer) clearInterval(gameTimer);
+            gameTimer = setInterval(() => {
+                if (!gameState.gameRunning) {
+                    clearInterval(gameTimer);
+                    return;
+                }
+                gameState.timeLeft--;
+                updateUI();
+                if (gameState.timeLeft <= 0) {
+                    clearInterval(gameTimer);
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function endGame() {
+            gameState.gameRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            clearInterval(gameTimer);
+
+            document.getElementById('finalScore').textContent = gameState.score;
+            document.getElementById('finalLevel').textContent = gameState.level;
+            document.getElementById('gameOver').style.display = 'block';
+
+            const gameArea = document.getElementById('gameArea');
+            gameArea.removeEventListener('mousemove', handleMouseMove);
+            gameArea.removeEventListener('click', handleMouseClick);
+            gameArea.removeEventListener('touchstart', handleTouch);
+            gameArea.style.cursor = 'default';
+
+            document.getElementById('crosshair').style.display = 'none';
+        }
+        
+        // --- Event Handlers ---
+        function handleMouseMove(e) {
+            if (!gameState.gameRunning) return;
+            updateCannonAiming(e.clientX, e.clientY);
+        }
+
+        function handleMouseClick(e) {
+            if (!gameState.gameRunning) return;
+            createProjectile(e.clientX, e.clientY);
+        }
+        
+        // Mobile "tap to shoot" handler
+        function handleTouch(e) {
+            e.preventDefault();
+            if (!gameState.gameRunning || !e.touches[0]) return;
+            const touch = e.touches[0];
+            updateCannonAiming(touch.clientX, touch.clientY); // Aim first
+            createProjectile(touch.clientX, touch.clientY);   // Then fire
+        }
+
+        function startGame() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            if (gameTimer) clearInterval(gameTimer);
+
+            gameState = {
+                score: 0, level: 1, timeLeft: 60, currentAnswer: 0,
+                bubbles: [], projectiles: [], gameRunning: true,
+                combo: 0, bubbleSpeed: 1
+            };
+            
+            const gameArea = document.getElementById('gameArea');
+            gameArea.innerHTML = `
+                <div class="cannon-barrel" id="cannonBarrel"></div>
+                <div class="cannon" id="cannon"></div>
+            `;
+            
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('crosshair').style.display = 'block';
+
+            // Add all event listeners
+            gameArea.addEventListener('mousemove', handleMouseMove);
+            gameArea.addEventListener('click', handleMouseClick);
+            gameArea.addEventListener('touchstart', handleTouch, { passive: false });
+            gameArea.style.cursor = 'none';
+
+            document.getElementById('equation').textContent = generateEquation();
+            updateUI();
+            
+            startTimer();
+            gameLoop();
+        }
+
+        // Start the game when page loads
+        window.onload = startGame;
+        window.onresize = () => {
+             // This could be used to readjust elements on resize if needed,
+             // but CSS handles most of it.
+        };
+    </script>
+</body>
+</html>
