@@ -133,7 +133,7 @@
 
         .game-card:nth-child(2) { animation-delay: 0.2s; }
         .game-card:nth-child(3) { animation-delay: 0.4s; }
-        /* Add more delays if you have more cards */
+        .game-card:nth-child(4) { animation-delay: 0.6s; } /* Added delay for the new card */
         
         .game-card::before { /* Animated glowing border */
             content: '';
@@ -282,6 +282,15 @@
             <div class="game-info">
                 <h3>Gravity Painter</h3>
                 <p>Draw with particles that dance to the laws of physics and create cosmic art.</p>
+            </div>
+        </a>
+        
+        <!-- NEW GAME CARD ADDED HERE -->
+        <a href="Math.html" class="game-card">
+            <img src="math_blaster_thumbnail.png" alt="Math Blaster" class="thumbnail" onerror="handleImageError(this)">
+            <div class="game-info">
+                <h3>Math Blaster</h3>
+                <p>Solve equations at light speed to destroy incoming threats!</p>
             </div>
         </a>
     </main>
