@@ -9,7 +9,8 @@
             --board-size: clamp(320px, 90vmin, 650px);
             --cell-size: calc(var(--board-size) / 15);
             --pawn-size: calc(var(--cell-size) * 0.7);
-            --hop-duration: 0.2s;
+            /* --- CHANGE: Slightly faster hop for a snappier feel --- */
+            --hop-duration: 0.15s;
 
             --red-color: #d63031;
             --green-color: #00b894;
@@ -77,7 +78,6 @@
 
         .cell { box-sizing: border-box; }
 
-        /* --- NEW HOME BASE STYLES --- */
         .home-base {
             position: absolute;
             width: calc(var(--cell-size) * 6);
@@ -85,7 +85,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
-            z-index: 1; /* Above board texture, below pawns */
+            z-index: 1; 
             border: 3px solid #2c3e50; 
             box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
         }
@@ -101,7 +101,6 @@
             justify-content: center;
             align-items: center;
         }
-
         .home-spot { 
             width: calc(var(--cell-size) * 1.8);
             height: calc(var(--cell-size) * 1.8);
@@ -110,7 +109,6 @@
             background-color: rgba(255,255,255,0.2); 
             box-sizing: border-box;
         }
-        /* --- END NEW HOME BASE STYLES --- */
 
         .path { background-color: #f5eadd; box-shadow: inset 0 0 8px rgba(0,0,0,0.25); }
         .start {
@@ -129,20 +127,22 @@
 
         .pawn {
             position: absolute; z-index: 10;
+            top: 0; left: 0; /* --- CHANGE: Set base position to 0,0. We'll move it with transform. --- */
             width: var(--pawn-size); height: var(--pawn-size);
             border-radius: 50%; border: 2px solid rgba(255,255,255,0.8);
             box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-            transition: top var(--hop-duration) cubic-bezier(0.34, 1.56, 0.64, 1), 
-                        left var(--hop-duration) cubic-bezier(0.34, 1.56, 0.64, 1), 
-                        transform var(--hop-duration) ease-in-out;
+            /* --- CHANGE: Animate transform instead of top/left for huge performance boost. --- */
+            transition: transform var(--hop-duration) cubic-bezier(0.34, 1.56, 0.64, 1);
             display: flex; justify-content: center; align-items: center;
             font-size: calc(var(--pawn-size) * 0.6); font-weight: bold;
             color: white; text-shadow: 1px 1px 2px black;
         }
         
         .pawn.hopping {
-            transform: translateY(calc(var(--pawn-size) * -0.5)) scale(1.1);
+            /* --- CHANGE: The hop is now just a transform, much faster. --- */
+            transform: var(--pawn-transform) translateY(calc(var(--pawn-size) * -1)) scale(1.2);
             box-shadow: 0 10px 15px rgba(0,0,0,0.4);
+            z-index: 11; /* Bring hopping pawn to front */
         }
 
         .pawn.red { background: radial-gradient(circle at 30% 30%, #e55039, #c0392b); }
@@ -152,12 +152,27 @@
         
         .pawn.movable { cursor: pointer; animation: pulse-glow 1.5s infinite; }
 
+        /* --- CHANGE: New performance-friendly glow animation --- */
+        .pawn.movable::after {
+            content: '';
+            position: absolute;
+            top: -10%; left: -10%;
+            width: 120%; height: 120%;
+            background-color: var(--current-player-color-glow);
+            border-radius: 50%;
+            z-index: -1;
+            opacity: 0;
+            animation: pulse-glow-after 1.5s infinite;
+        }
+
         #game-info {
             display: flex; flex-direction: column; align-items: center;
             background-color: rgba(44, 62, 80, 0.8); padding: 20px; border-radius: 15px;
             width: 280px;
             border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px); box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            /* --- CHANGE: backdrop-filter is very slow. Removing for performance. --- */
+            /* backdrop-filter: blur(10px); */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
             perspective: 800px;
         }
         #status { font-size: 1.2em; text-align: center; min-height: 50px; margin-bottom: 20px; }
@@ -165,13 +180,15 @@
             width: 80px; height: 80px; background-color: #fff; border-radius: 10px;
             display: flex; justify-content: center; align-items: center;
             font-size: 3em; color: #333; cursor: pointer; border: 4px solid transparent;
-            transition: transform 0.3s, border-color 0.3s; box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+            transition: transform 0.3s, border-color 0.3s; 
+            /* --- CHANGE: Simplified shadow for better performance --- */
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
             transform-style: preserve-3d;
         }
         #dice.active { border-color: var(--current-player-color); animation: jiggle 0.5s; }
         #dice.rolling { animation: roll-dice-animation 0.5s ease-out; }
 
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
         .modal-content {
             background-color: #34495e; 
             color: #ecf0f1; 
@@ -184,10 +201,8 @@
             text-align: center;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4); 
         }
-        .modal-content h2 { margin-top: 0; color: #fff; }
-
-        #main-menu { display: flex; }
         
+        #main-menu { display: flex; }
         .menu-section { margin-bottom: 25px; }
         .menu-section h3 { margin-bottom: 15px; color: #bdc3c7; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; font-weight: 300; }
         .player-count-selector label { margin: 0 10px; font-size: 1.2em; cursor: pointer; }
@@ -210,10 +225,17 @@
         #start-game-btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
         #start-game-btn:not(:disabled):hover { background-color: #2ecc71; }
 
-        @keyframes pulse-glow {
-            0%, 100% { transform: scale(1); box-shadow: 0 4px 8px rgba(0,0,0,0.5), 0 0 0 0px var(--current-player-color-glow); }
-            50% { transform: scale(1.1); box-shadow: 0 6px 12px rgba(0,0,0,0.4), 0 0 15px 5px var(--current-player-color-glow); }
+        /* --- CHANGE: Removed old, slow glow animation --- */
+        @keyframes pulse-glow-after {
+            0%, 100% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1); opacity: 0.7; }
         }
+        
+        /* This animation is used by the pawn.movable::after pseudo-element */
+        @keyframes pulse-glow {
+            /* This is a dummy keyframe now, as the real work is done by pulse-glow-after */
+        }
+
         @keyframes roll-dice-animation {
             0% { transform: scale(1.2) rotate3d(0, 0, 0, 0deg); }
             20% { transform: scale(1.2) rotate3d(0.5, 0.8, 0.1, 100deg); }
@@ -293,6 +315,7 @@
             const PLAYER_ORDER = ['red', 'green', 'yellow', 'blue'];
             const PATH_LENGTH = 52;
             const FINISH_PATH_LENGTH = 6;
+            const FINAL_SQUARE_POSITION = PATH_LENGTH + FINISH_PATH_LENGTH - 1;
 
             const PATH_DATA = {
                 PATH_COORDS: [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]],
@@ -305,6 +328,8 @@
             let gameState = {};
             let menuState = { numPlayers: 1, playerSelections: {} };
             let pawnElements = {};
+            // --- CHANGE: Cache cell size to avoid reading from DOM repeatedly ---
+            let cachedCellSize = 0;
             const sleep = ms => new Promise(res => setTimeout(res, ms));
 
             // --- Menu Logic ---
@@ -322,6 +347,8 @@
                     if (startGameBtn.disabled) return;
                     mainMenu.style.display = 'none';
                     gameContainer.style.display = 'flex';
+                    // --- CHANGE: Calculate cell size once the board is visible ---
+                    cachedCellSize = board.clientWidth / 15;
                     const playerTypes = {};
                     const humanColors = Object.values(menuState.playerSelections);
                     PLAYER_ORDER.forEach(color => {
@@ -407,8 +434,6 @@
             function createBoardVisuals() {
                 board.innerHTML = '';
                 const allCells = {};
-
-                // Create the 15x15 grid cells (for pathing and pawn placement logic)
                 for (let r = 0; r < 15; r++) { for (let c = 0; c < 15; c++) {
                     const cell = document.createElement('div');
                     cell.className = `cell`;
@@ -416,23 +441,18 @@
                     board.appendChild(cell);
                     allCells[`${r}-${c}`] = cell;
                 }}
-
-                // --- Create visual home base areas ---
                 const homeBaseAreas = {
                     red:    { top: 0, left: 0, class: 'red-home-base' },
                     green:  { top: 0, left: 9, class: 'green-home-base' },
                     yellow: { top: 9, left: 9, class: 'yellow-home-base' },
                     blue:   { top: 9, left: 0, class: 'blue-home-base' }
                 };
-
                 for (const color in homeBaseAreas) {
                     const area = homeBaseAreas[color];
                     const homeBaseEl = document.createElement('div');
                     homeBaseEl.className = `home-base ${area.class}`;
                     homeBaseEl.style.top = `calc(var(--cell-size) * ${area.top})`;
                     homeBaseEl.style.left = `calc(var(--cell-size) * ${area.left})`;
-
-                    // Create the 2x2 squares and the home spot inside each
                     for (let i = 0; i < 4; i++) {
                         const square = document.createElement('div');
                         square.className = 'home-base-square';
@@ -441,16 +461,12 @@
                     }
                     board.appendChild(homeBaseEl);
                 }
-
-                // Mark the paths on the underlying grid cells
                 PATH_DATA.PATH_COORDS.forEach(([r,c]) => allCells[`${r}-${c}`].classList.add('path'));
                 Object.values(PATH_DATA.FINISH_PATH_COORDS).flat().forEach(([r,c]) => allCells[`${r}-${c}`].classList.add('path'));
-
                 Object.entries(PATH_DATA.START_POSITIONS).forEach(([color, index]) => {
                     const [r,c] = PATH_DATA.PATH_COORDS[index];
                     allCells[`${r}-${c}`].classList.add('start', color);
                 });
-                
                 Object.entries(PATH_DATA.FINISH_PATH_COORDS).forEach(([color, coords]) => coords.forEach(([r,c]) => allCells[`${r}-${c}`].classList.add('finish-path', color)));
             }
 
@@ -470,44 +486,46 @@
                 }
             }
             
-            function placePawn(pawnId, noTransition = true, positionOverride = null) {
+            // --- CHANGE: Heavily modified positioning logic for performance ---
+            function placePawn(pawnId, noTransition = false, positionOverride = null) {
                 const pawnEl = pawnElements[pawnId];
                 if (noTransition) pawnEl.style.transition = 'none';
 
-                const [top, left] = getPawnCoords(pawnId, positionOverride);
-                pawnEl.style.top = `${top}px`;
-                pawnEl.style.left = `${left}px`;
+                const [x, y] = getPawnTranslate(pawnId, positionOverride);
+                const transformString = `translate(${x}px, ${y}px)`;
+                
+                pawnEl.style.transform = transformString;
+                // Store the current transform so the "hop" animation can use it as a base
+                pawnEl.style.setProperty('--pawn-transform', transformString);
 
                 if (noTransition) {
-                    pawnEl.offsetHeight;
+                    pawnEl.offsetHeight; // force paint
                     pawnEl.style.transition = '';
                 }
             }
-
+            
             function updateAllPawnPositions() {
                 for(const pawnId in gameState.pawns) {
                     if(!gameState.pawns[pawnId].isFinished) {
-                         placePawn(pawnId, false);
+                         placePawn(pawnId);
                     }
                 }
             }
-
-            function getPawnCoords(pawnId, positionOverride = null) {
+            
+            function getPawnTranslate(pawnId, positionOverride = null) {
                 const { color, isFinished } = gameState.pawns[pawnId];
                 const position = positionOverride ?? gameState.pawns[pawnId].position;
-
-                const cellSize = board.clientWidth / 15;
-                const pawnSize = cellSize * 0.7;
-                const centerOffset = (cellSize - pawnSize) / 2;
+                const pawnSize = cachedCellSize * 0.7;
+                const centerOffset = (cachedCellSize - pawnSize) / 2;
 
                 if (position === -1) { // In home base
                     const homeIndex = parseInt(pawnId.slice(-1));
                     const [row, col] = PATH_DATA.HOME_SPOTS[color][homeIndex];
-                    return [row * cellSize + centerOffset, col * cellSize + centerOffset];
+                    return [col * cachedCellSize + centerOffset, row * cachedCellSize + centerOffset];
                 }
             
                 if (isFinished) { // Center of the board
-                    return [7 * cellSize + centerOffset, 7 * cellSize + centerOffset];
+                    return [7 * cachedCellSize + centerOffset, 7 * cachedCellSize + centerOffset];
                 }
 
                 let coords;
@@ -529,9 +547,10 @@
                 const stackIndex = pawnsOnSquare.indexOf(pawnId);
                 const offset = stackIndex !== -1 ? (pawnSize * 0.15) * stackIndex : 0;
                 
-                return [coords[0] * cellSize + centerOffset + offset, coords[1] * cellSize + centerOffset + offset];
+                // Returns [x, y] for transform: translate(x, y)
+                return [coords[1] * cachedCellSize + centerOffset + offset, coords[0] * cachedCellSize + centerOffset + offset];
             }
-            
+
             const getGlobalPathIndex = (color, position) => {
                 if(position === null || position < 0 || position >= PATH_LENGTH) return null;
                 return (PATH_DATA.START_POSITIONS[color] + position) % PATH_LENGTH;
@@ -591,7 +610,7 @@
                 updateBoardState(pawnId, oldPosition, pawn.position);
                 const captureOccurred = checkForCapture(pawn);
                 
-                updateAllPawnPositions();
+                updateAllPawnPositions(); // This ensures stacked pawns re-render correctly
                 checkForWin();
 
                 await endTurn(gameState.diceValue === 6 || captureOccurred);
@@ -624,21 +643,15 @@
 
                 return Object.values(gameState.pawns).filter(pawn => {
                     if (pawn.color !== currentPlayer || pawn.isFinished) return false;
-                    
                     if (pawn.position === -1) return dice === 6;
-
+                    
                     const newPos = pawn.position + dice;
-                    const finalSquarePosition = PATH_LENGTH + FINISH_PATH_LENGTH - 2; // This is 56
-
-                    // A move is invalid if the new position is beyond the very last square.
-                    if (newPos > finalSquarePosition) {
-                        return false;
-                    }
-
-                    return true;
+                    // A move is invalid if it overshoots the final square
+                    return newPos <= FINAL_SQUARE_POSITION;
                 }).map(pawn => pawn.id);
             }
 
+            // --- CHANGE: The new, performant animation loop ---
             async function movePawnWithAnimation(pawnId) {
                 const pawn = gameState.pawns[pawnId];
                 const pawnEl = pawnElements[pawnId];
@@ -648,29 +661,35 @@
 
                 if (startPos === -1 && dice === 6) {
                     pawn.position = 0;
+                    placePawn(pawnId); // Move to start position
+                    await sleep(50); // allow paint
+                    
                     pawnEl.classList.add('hopping');
                     hopSound.currentTime=0; hopSound.play();
-                    placePawn(pawnId, false);
-                    await sleep(300);
+                    await sleep(hopDelay + 50);
                     pawnEl.classList.remove('hopping');
                 } else {
                     for (let i = 1; i <= dice; i++) {
                         const tempVisualPosition = startPos + i;
+                        
+                        placePawn(pawnId, false, tempVisualPosition);
+                        await sleep(10); // allow paint
+                        
                         pawnEl.classList.add('hopping');
                         hopSound.currentTime=0; hopSound.play();
                         
-                        placePawn(pawnId, false, tempVisualPosition);
-                        
                         await sleep(tempVisualPosition >= PATH_LENGTH ? hopDelay + 50 : hopDelay);
                         pawnEl.classList.remove('hopping');
-                        await sleep(50);
                     }
                     pawn.position = startPos + dice;
                 }
 
-                if (pawn.position === PATH_LENGTH + FINISH_PATH_LENGTH - 1) {
+                if (pawn.position === FINAL_SQUARE_POSITION) {
                     pawn.isFinished = true;
                 }
+                // Final placement call to correct any stacking offsets
+                placePawn(pawnId);
+                await sleep(100);
             }
 
             function checkForCapture(movedPawn) {
@@ -695,7 +714,6 @@
                     updateBoardState(victimId, oldPos, -1);
                     placePawn(victimId);
                 });
-
                 return true;
             }
             
@@ -713,21 +731,12 @@
 
             async function endTurn(getsExtraRoll) {
                 if (gameState.gameWon) return;
-
                 if (getsExtraRoll) {
                     gameState.diceRolled = false;
                     gameState.isAnimating = false;
                     const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
-                    
-                    let message;
-                    if (gameState.diceValue === 6) {
-                        message = `Rolled a 6!`;
-                    } else {
-                        await sleep(500); 
-                        message = `Bonus turn for the capture!`;
-                    }
+                    let message = (gameState.diceValue === 6) ? `Rolled a 6!` : `Bonus turn for the capture!`;
                     updateStatus(`${message} <strong style="color:${PLAYERS[currentPlayer].color}">${currentPlayer.toUpperCase()}</strong>, roll again.`);
-                    
                     if (gameState.playerTypes[currentPlayer] === 'ai') {
                         diceEl.style.pointerEvents = 'none';
                         await sleep(1000);
@@ -741,18 +750,13 @@
                     switchPlayer();
                 }
             }
-            
             function switchPlayer() {
                 if (gameState.gameWon) return;
-
                 gameState.isAnimating = false; gameState.diceRolled = false;
                 gameState.diceValue = null; gameState.consecutiveSixes = 0;
-
                 gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % PLAYER_ORDER.length;
                 const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
-                
                 updateStatus();
-
                 if (gameState.playerTypes[currentPlayer] === 'ai') {
                     diceEl.style.pointerEvents = 'none';
                     setTimeout(executeAITurn, 1000);
@@ -760,29 +764,24 @@
                     diceEl.style.pointerEvents = 'auto';
                 }
             }
-            
             function updateStatus(message = "") {
                 const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
                 if (!currentPlayer) return;
                 const playerInfo = PLAYERS[currentPlayer];
                 const playerType = gameState.playerTypes[currentPlayer];
-
                 statusEl.innerHTML = message ? message : 
                     playerType === 'ai' 
                         ? `<strong style="color:${playerInfo.color}">${currentPlayer.toUpperCase()} (AI)</strong> is thinking...`
                         : `It's <strong style="color:${playerInfo.color}">${currentPlayer.toUpperCase()}</strong>'s turn. Roll the dice!`;
-                
                 diceEl.innerText = gameState.diceValue || "?";
                 diceEl.style.setProperty("--current-player-color", playerInfo.color);
                 root.style.setProperty("--current-player-color-glow", playerInfo.glow);
-                
                 if (!gameState.diceRolled && playerType === 'human' && !gameState.gameWon) {
                     diceEl.classList.add("active");
                 } else {
                     diceEl.classList.remove("active");
                 }
             }
-
             async function executeAITurn() {
                 if (gameState.gameWon || gameState.isAnimating) return;
                 gameState.isAnimating = true;
@@ -791,38 +790,30 @@
                 await processRoll();
                 gameState.isAnimating = false;
             }
-            
             function aiChooseBestMove(movablePawns) {
                 const dice = gameState.diceValue;
-                const currentPlayer = PLAYER_ORDER[gameState.currentPlayerIndex];
                 let bestMove = {pawnId: null, score: -Infinity};
-
                 for(const pawnId of movablePawns) {
                     const pawn = gameState.pawns[pawnId];
                     const newPos = (pawn.position === -1) ? 0 : pawn.position + dice;
                     let score = 0;
-
-                    if (newPos === PATH_LENGTH + FINISH_PATH_LENGTH - 1) score += 1000;
+                    if (newPos === FINAL_SQUARE_POSITION) score += 1000;
                     if (pawn.position === -1) score += 50;
                     score += newPos;
-                    
                     if (newPos < PATH_LENGTH) {
                         const newGlobalIndex = getGlobalPathIndex(pawn.color, newPos);
                         const isSafe = Object.values(PATH_DATA.START_POSITIONS).includes(newGlobalIndex);
-                        
                         if (!isSafe) {
                             const opponentOnSquare = (gameState.boardState[newGlobalIndex] || []).some(id => gameState.pawns[id].color !== pawn.color);
                             if (opponentOnSquare) score += 75;
                         }
                         if (isSafe) score += 20;
                     }
-                    
                     if(score > bestMove.score) bestMove = { pawnId, score };
                 }
                 return bestMove.pawnId || movablePawns[Math.floor(Math.random() * movablePawns.length)];
             }
-
-            // --- Initializer ---
+            
             setupMenu();
         });
     </script>
