@@ -311,7 +311,9 @@
                 blue: { color: 'var(--blue-color)', glow: 'rgba(9, 132, 227, 0.7)' }
             };
             const PLAYER_ORDER = ['red', 'green', 'yellow', 'blue'];
-            const PATH_LENGTH = 52;
+            // --- FIX: The number of steps a pawn takes on the main path to reach its home entry is 51.
+            // The main path has 52 squares, but a pawn travels 51 steps on it before entering the finish path.
+            const PATH_LENGTH = 51;
             const FINISH_PATH_LENGTH = 6;
             const FINAL_SQUARE_POSITION = PATH_LENGTH + FINISH_PATH_LENGTH - 1;
 
@@ -531,10 +533,10 @@
                 }
 
                 let coords;
-                if (position >= PATH_LENGTH) { // On finish path
+                if (position >= PATH_LENGTH) { // On finish path (position 51 or greater)
                     const finishIndex = position - PATH_LENGTH;
                     coords = PATH_DATA.FINISH_PATH_COORDS[color][finishIndex];
-                } else { // On main path
+                } else { // On main path (position 0-50)
                     const pathIndex = getGlobalPathIndex(color, position);
                     coords = PATH_DATA.PATH_COORDS[pathIndex];
                 }
@@ -562,7 +564,8 @@
 
             const getGlobalPathIndex = (color, position) => {
                 if(position === null || position < 0 || position >= PATH_LENGTH) return null;
-                return (PATH_DATA.START_POSITIONS[color] + position) % PATH_LENGTH;
+                // --- FIX: The main path is a cycle of 52 squares, so the modulo must always be 52.
+                return (PATH_DATA.START_POSITIONS[color] + position) % 52;
             }
 
             // --- Core Game Loop & Player Actions ---
