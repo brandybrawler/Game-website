@@ -9,6 +9,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            user-select: none; /* Prevent text selection during gameplay */
         }
 
         html, body {
@@ -20,14 +21,76 @@
             font-family: 'Arial', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* --- Main Menu --- */
+        #mainMenu {
+            text-align: center;
+            padding: 30px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            width: 90%;
+            max-width: 500px;
+        }
+
+        #mainMenu h1 {
+            font-size: 48px;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+
+        #mainMenu p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .start-btn {
+            background: linear-gradient(45deg, #4ecdc4, #556270);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 22px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .start-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         }
 
         .game-container {
             position: relative;
             width: 100vw;
             height: 100%;
-            display: flex;
+            display: none; /* Hidden by default */
             flex-direction: column;
+        }
+
+        /* --- Screen Flash Feedback --- */
+        .flash-correct {
+            animation: flash-green 0.3s ease-out;
+        }
+        .flash-incorrect {
+            animation: flash-red 0.3s ease-out;
+        }
+        @keyframes flash-green {
+            0%, 100% { box-shadow: inset 0 0 0 0 transparent; }
+            50% { box-shadow: inset 0 0 100px 50px rgba(78, 205, 196, 0.7); }
+        }
+        @keyframes flash-red {
+            0%, 100% { box-shadow: inset 0 0 0 0 transparent; }
+            50% { box-shadow: inset 0 0 100px 50px rgba(255, 107, 107, 0.7); }
         }
 
         .header {
@@ -86,12 +149,7 @@
             transition: all 0.2s;
             z-index: 50;
         }
-
-        .cannon:hover {
-            transform: translateX(-50%) scale(1.1);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.4);
-        }
-
+        
         .cannon::before {
             content: '🚀';
             position: absolute;
@@ -103,7 +161,7 @@
 
         .cannon-barrel {
             position: absolute;
-            bottom: 100px; /* This is the pivot point for rotation */
+            bottom: 100px;
             left: 50%;
             width: 8px;
             height: 40px;
@@ -127,8 +185,8 @@
         }
 
         @keyframes projectile-glow {
-            0% { box-shadow: 0 0 20px rgba(254, 202, 87, 0.8); }
-            100% { box-shadow: 0 0 30px rgba(254, 202, 87, 1), 0 0 40px rgba(255, 159, 243, 0.5); }
+            from { box-shadow: 0 0 20px rgba(254, 202, 87, 0.8); }
+            to { box-shadow: 0 0 30px rgba(254, 202, 87, 1), 0 0 40px rgba(255, 159, 243, 0.5); }
         }
 
         .crosshair {
@@ -141,41 +199,20 @@
             z-index: 60;
             opacity: 0.8;
             animation: crosshair-pulse 1s infinite;
-            display: none; /* Hidden by default, shown for mouse users */
+            display: none;
         }
         
-        @media (pointer: fine) { /* Show crosshair only on devices with fine pointers (mice) */
-             .crosshair {
-                display: block;
-             }
+        @media (pointer: fine) {
+             .crosshair { display: block; }
         }
 
-        .crosshair::before,
-        .crosshair::after {
-            content: '';
-            position: absolute;
-            background: #feca57;
-            box-shadow: 0 0 10px rgba(254, 202, 87, 0.8);
+        .crosshair::before, .crosshair::after {
+            content: ''; position: absolute; background: #feca57; box-shadow: 0 0 10px rgba(254, 202, 87, 0.8);
         }
-
-        .crosshair::before {
-            width: 20px;
-            height: 2px;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-
-        .crosshair::after {
-            width: 2px;
-            height: 20px;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
+        .crosshair::before { width: 20px; height: 2px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .crosshair::after { width: 2px; height: 20px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
         @keyframes crosshair-pulse {
-            0%, 100% { transform: scale(1); opacity: 0.8; }
             50% { transform: scale(1.2); opacity: 1; }
         }
 
@@ -197,11 +234,7 @@
             border: 3px solid rgba(255,255,255,0.3);
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-
-        .number-bubble:hover {
-            transform: scale(1.2);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-        }
+        .number-bubble.special { font-size: 36px; }
 
         @keyframes float {
             0%, 100% { transform: translateY(0px) rotate(0deg); }
@@ -218,149 +251,82 @@
         }
 
         @keyframes explode {
-            0% {
-                transform: scale(0) rotate(0deg);
-                opacity: 1;
-            }
-            100% {
-                transform: scale(2) rotate(180deg);
-                opacity: 0;
-            }
+            from { transform: scale(0) rotate(0deg); opacity: 1; }
+            to { transform: scale(2) rotate(180deg); opacity: 0; }
         }
 
         .game-over {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            z-index: 200;
-            display: none;
-            width: 90%;
-            max-width: 400px;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); padding: 40px; border-radius: 20px;
+            text-align: center; z-index: 200; display: none; width: 90%; max-width: 400px;
         }
 
-        .game-over h2 {
-            font-size: 48px;
-            margin-bottom: 20px;
-            color: #ff6b6b;
-        }
-
+        .game-over h2 { font-size: 48px; margin-bottom: 20px; color: #ff6b6b; }
         .restart-btn {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            font-size: 20px;
-            border-radius: 25px;
-            cursor: pointer;
-            margin-top: 20px;
-            transition: all 0.3s;
+            background: linear-gradient(45deg, #667eea, #764ba2); color: white;
+            border: none; padding: 15px 30px; font-size: 20px;
+            border-radius: 25px; cursor: pointer; margin-top: 20px; transition: all 0.3s;
         }
-
-        .restart-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-        }
+        .restart-btn:hover { transform: scale(1.1); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
 
         .particle {
-            position: absolute;
-            width: 8px;
-            height: 8px;
-            background: #feca57;
-            border-radius: 50%;
-            pointer-events: none;
-            animation: particle-fall 2s linear forwards;
+            position: absolute; width: 8px; height: 8px; background: #feca57;
+            border-radius: 50%; pointer-events: none; animation: particle-fall 2s linear forwards;
         }
+        @keyframes particle-fall { to { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
 
-        @keyframes particle-fall {
-            to {
-                transform: translateY(100vh) rotate(360deg);
-                opacity: 0;
-            }
+        /* --- New UI element styles --- */
+        .game-notice {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); font-size: 36px;
+            font-weight: bold; color: #feca57;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); pointer-events: none;
+            animation: notice-popup 1s ease-out forwards;
         }
-
-        .combo {
+        @keyframes notice-popup {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.2); }
+            100% { transform: translate(-50%, -60%) scale(1); opacity: 0; }
+        }
+        
+        .floating-text {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 36px;
+            font-size: 24px;
             font-weight: bold;
-            color: #feca57;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
             pointer-events: none;
-            animation: combo-popup 1s ease-out forwards;
+            animation: float-up 1.5s ease-out forwards;
         }
-
-        @keyframes combo-popup {
-            0% {
-                transform: translate(-50%, -50%) scale(0);
-                opacity: 1;
-            }
-            50% {
-                transform: translate(-50%, -50%) scale(1.2);
-            }
-            100% {
-                transform: translate(-50%, -60%) scale(1);
+        @keyframes float-up {
+            to {
+                transform: translateY(-80px);
                 opacity: 0;
             }
         }
         
-        /* --- Responsive Design for Mobile Devices --- */
         @media (max-width: 768px) {
-            .score, .level, .time {
-                font-size: 18px;
-            }
-            .header {
-                padding: 15px;
-            }
-            .equation-display {
-                font-size: 36px;
-                padding: 15px;
-            }
-            .number-bubble {
-                width: 50px;
-                height: 50px;
-                font-size: 20px;
-            }
-            .cannon {
-                width: 60px;
-                height: 60px;
-                bottom: 10px;
-            }
-            .cannon::before {
-                font-size: 24px;
-            }
-            .cannon-barrel {
-                height: 30px;
-                bottom: 70px; /* Adjust barrel pivot for smaller cannon */
-            }
-            .game-over h2 {
-                font-size: 36px;
-            }
-            .restart-btn {
-                padding: 12px 24px;
-                font-size: 18px;
-            }
-        }
-
-        @media (max-height: 600px) {
-             .header {
-                padding: 10px;
-            }
-            .equation-display {
-                font-size: 32px;
-                padding: 10px;
-            }
+            #mainMenu h1 { font-size: 36px; }
+            #mainMenu p { font-size: 16px; }
+            .score, .level, .time { font-size: 18px; }
+            .header { padding: 15px; }
+            .equation-display { font-size: 36px; padding: 15px; }
+            .number-bubble { width: 50px; height: 50px; font-size: 20px; }
+            .number-bubble.special { font-size: 28px; }
+            .cannon { width: 60px; height: 60px; bottom: 10px; }
+            .cannon::before { font-size: 24px; }
+            .cannon-barrel { height: 30px; bottom: 70px; }
+            .game-over h2 { font-size: 36px; }
+            .restart-btn { padding: 12px 24px; font-size: 18px; }
         }
     </style>
 </head>
 <body>
-    <div class="game-container">
+    <div id="mainMenu">
+        <h1>Number Blast</h1>
+        <p>Solve the equation at the top by shooting the correct number bubble. Hit special bubbles for bonuses, but watch out for penalties! How high can you score before time runs out?</p>
+        <button class="start-btn" id="startGameBtn">Start Game</button>
+    </div>
+
+    <div class="game-container" id="gameContainer">
         <div class="header">
             <div class="score">Score: <span id="score">0</span></div>
             <div class="level">Level: <span id="level">1</span></div>
@@ -375,12 +341,18 @@
             <h2>Game Over!</h2>
             <p>Final Score: <span id="finalScore">0</span></p>
             <p>Level Reached: <span id="finalLevel">1</span></p>
-            <button class="restart-btn" onclick="startGame()">Play Again</button>
+            <button class="restart-btn" id="playAgainBtn">Play Again</button>
         </div>
         <div class="crosshair" id="crosshair"></div>
     </div>
 
     <script>
+        const mainMenu = document.getElementById('mainMenu');
+        const gameContainer = document.getElementById('gameContainer');
+        const startGameBtn = document.getElementById('startGameBtn');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+        const gameArea = document.getElementById('gameArea');
+
         let gameState = {};
         let gameTimer = null;
         let animationFrameId = null;
@@ -393,11 +365,8 @@
 
         function generateEquation() {
             const operations = ['+', '-', '×', '÷'];
-            let operationIndex = Math.floor(Math.random() * operations.length);
-            if (gameState.level < 3 && (operations[operationIndex] === '×' || operations[operationIndex] === '÷')) {
-                operationIndex = Math.floor(Math.random() * 2); // Force + or -
-            }
-            const operation = operations[operationIndex];
+            let opIndex = Math.floor(Math.random() * (gameState.level < 3 ? 2 : 4));
+            const operation = operations[opIndex];
             let num1, num2, answer;
 
             switch(operation) {
@@ -433,80 +402,90 @@
             const isMobile = window.innerWidth <= 768;
             const bubbleSize = isMobile ? 50 : 60;
             
-            let number;
-            if (Math.random() < 0.35 + (gameState.level * 0.01)) { 
-                number = gameState.currentAnswer;
+            let bubbleData = {
+                element: bubbleEl, y: -bubbleSize, 
+                x: Math.random() * (window.innerWidth - bubbleSize),
+                radius: bubbleSize / 2
+            };
+
+            const rand = Math.random();
+            // Decide what kind of bubble to create
+            if (rand < 0.03 && gameState.level > 1) { // 3% chance for a Bomb
+                bubbleData.type = 'bomb';
+                bubbleEl.textContent = '💣';
+                bubbleEl.classList.add('special');
+                bubbleEl.style.background = 'linear-gradient(135deg, #333, #666)';
+            } else if (rand < 0.08) { // 5% chance for a Time Bonus
+                bubbleData.type = 'time';
+                bubbleEl.textContent = '⏰';
+                bubbleEl.classList.add('special');
+                bubbleEl.style.background = 'linear-gradient(135deg, #00c6ff, #0072ff)';
+            } else if (rand < 0.13 && gameState.level > 2) { // 5% chance for a Penalty
+                bubbleData.type = 'penalty';
+                bubbleEl.textContent = '💀';
+                bubbleEl.classList.add('special');
+                bubbleEl.style.background = 'linear-gradient(135deg, #8B0000, #2c0000)';
+            } else if (rand < 0.45) { // Increased chance for correct answer
+                bubbleData.type = 'number';
+                bubbleData.number = gameState.currentAnswer;
+                bubbleEl.textContent = bubbleData.number;
+                bubbleEl.style.background = `linear-gradient(135deg, #feca57, #ff9ff3)`;
             } else {
+                bubbleData.type = 'number';
                 const offset = gameState.currentAnswer + 20;
-                number = Math.floor(Math.random() * offset) + Math.max(1, gameState.currentAnswer - 10);
+                let number = Math.floor(Math.random() * offset) + Math.max(1, gameState.currentAnswer - 10);
                 while (number === gameState.currentAnswer) {
                     number = Math.floor(Math.random() * offset) + 1;
                 }
+                bubbleData.number = number;
+                bubbleEl.textContent = number;
+                bubbleEl.style.background = `linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()})`;
             }
-            
-            bubbleEl.textContent = number;
-            bubbleEl.style.background = `linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()})`;
-            bubbleEl.style.left = Math.random() * (window.innerWidth - bubbleSize) + 'px';
+
+            bubbleEl.style.left = bubbleData.x + 'px';
             bubbleEl.style.top = `-${bubbleSize}px`;
             
-            document.getElementById('gameArea').appendChild(bubbleEl);
-            const bubbleData = {
-                element: bubbleEl, 
-                number: number, 
-                y: -bubbleSize, 
-                x: parseFloat(bubbleEl.style.left),
-                radius: bubbleSize / 2
-            };
+            gameArea.appendChild(bubbleEl);
             gameState.bubbles.push(bubbleData);
         }
         
         function getCannonPivot() {
             const isMobile = window.innerWidth <= 768;
             const yOffset = isMobile ? 70 : 100;
-            return {
-                x: window.innerWidth / 2,
-                y: window.innerHeight - yOffset
-            };
+            return { x: window.innerWidth / 2, y: window.innerHeight - yOffset };
+        }
+
+        function getCannonCenter() {
+            const isMobile = window.innerWidth <= 768;
+            const cannonBottom = isMobile ? 10 : 20;
+            const cannonHeight = isMobile ? 60 : 80;
+            return { x: window.innerWidth / 2, y: window.innerHeight - cannonBottom - (cannonHeight / 2) };
         }
 
         function createProjectile(targetX, targetY) {
-            const pivot = getCannonPivot();
-            const startX = pivot.x - 10; // Center projectile on barrel
-            const startY = pivot.y - 20; // Start at barrel tip
-            
+            const startPos = getCannonCenter();
             const projectile = document.createElement('div');
             projectile.className = 'projectile';
-            projectile.style.left = startX + 'px';
-            projectile.style.top = startY + 'px';
+            projectile.style.left = (startPos.x - 10) + 'px';
+            projectile.style.top = (startPos.y - 10) + 'px';
+            gameArea.appendChild(projectile);
             
-            document.getElementById('gameArea').appendChild(projectile);
-            
+            const pivot = getCannonPivot();
             const angle = Math.atan2(targetY - pivot.y, targetX - pivot.x);
             const speed = 15;
-            
             const deltaX = Math.cos(angle) * speed;
             const deltaY = Math.sin(angle) * speed;
             
             gameState.projectiles.push({
-                element: projectile, x: startX, y: startY, deltaX, deltaY, radius: 10
+                element: projectile, x: startPos.x - 10, y: startPos.y - 10, deltaX, deltaY, radius: 10
             });
-            
-            createMuzzleFlash(pivot.x, pivot.y);
+            createMuzzleFlash(startPos.x, startPos.y);
         }
 
         function createMuzzleFlash(x, y) {
             const flash = document.createElement('div');
-            flash.style.position = 'absolute';
-            flash.style.left = x - 15 + 'px';
-            flash.style.top = y - 15 + 'px';
-            flash.style.width = '30px';
-            flash.style.height = '30px';
-            flash.style.background = 'radial-gradient(circle, #fff, #feca57, transparent)';
-            flash.style.borderRadius = '50%';
-            flash.style.animation = 'explode 0.3s ease-out forwards';
-            flash.style.pointerEvents = 'none';
-            flash.style.zIndex = '45';
-            document.getElementById('gameArea').appendChild(flash);
+            flash.style.cssText = `position:absolute; left:${x-15}px; top:${y-15}px; width:30px; height:30px; background:radial-gradient(circle, #fff, #feca57, transparent); border-radius:50%; animation:explode 0.3s ease-out forwards; pointer-events:none; z-index:45;`;
+            gameArea.appendChild(flash);
             setTimeout(() => flash.remove(), 300);
         }
 
@@ -515,14 +494,14 @@
                 const p = gameState.projectiles[i];
                 p.x += p.deltaX;
                 p.y += p.deltaY;
-                
                 p.element.style.left = p.x + 'px';
                 p.element.style.top = p.y + 'px';
                 
                 let hit = false;
                 for (let j = gameState.bubbles.length - 1; j >= 0; j--) {
                     const b = gameState.bubbles[j];
-                    const dist = Math.hypot( (p.x + p.radius) - (b.x + b.radius), (p.y + p.radius) - (b.y + b.radius) );
+                    if (b.element.dataset.hit) continue;
+                    const dist = Math.hypot((p.x + p.radius) - (b.x + b.radius), (p.y + p.radius) - (b.y + b.radius));
                     if (dist < p.radius + b.radius) {
                         hitBubble(b, j);
                         hit = true;
@@ -530,34 +509,68 @@
                     }
                 }
                 
-                // Remove projectile if it hit something or goes way off-screen
                 if (hit || p.y < -50 || p.y > window.innerHeight + 50 || p.x < -50 || p.x > window.innerWidth + 50) {
                     p.element.remove();
                     gameState.projectiles.splice(i, 1);
                 }
             }
         }
-
+        
         function hitBubble(bubble, bubbleIndex) {
-            if (bubble.element.dataset.hit) return; // Prevent double hits
+            if (bubble.element.dataset.hit) return;
             bubble.element.dataset.hit = true;
-
-            if (bubble.number === gameState.currentAnswer) {
-                gameState.score += 10 + (gameState.combo * 5);
-                gameState.combo++;
-                if (gameState.combo > 1) showCombo();
-                createExplosion(bubble.element, '#4ecdc4');
-                createParticles(bubble.element);
-                document.getElementById('equation').textContent = generateEquation();
-                if (gameState.score >= gameState.level * 100) {
-                    gameState.level++;
-                    gameState.bubbleSpeed += 0.2;
-                    gameState.timeLeft += 10;
-                }
-            } else {
-                gameState.combo = 0;
-                gameState.timeLeft = Math.max(0, gameState.timeLeft - 3);
-                createExplosion(bubble.element, '#ff6b6b');
+            let pointsGained = 0;
+            const bubbleRect = bubble.element.getBoundingClientRect();
+            
+            switch(bubble.type) {
+                case 'number':
+                    if (bubble.number === gameState.currentAnswer) {
+                        flashScreen(true);
+                        pointsGained = 10 + (gameState.combo * 5);
+                        gameState.score += pointsGained;
+                        gameState.combo++;
+                        if (gameState.combo > 1) showGameNotice(`${gameState.combo}x COMBO!`);
+                        createExplosion(bubble.element, '#4ecdc4');
+                        createParticles(bubble.element);
+                        document.getElementById('equation').textContent = generateEquation();
+                        
+                        if (gameState.score >= gameState.level * 100) {
+                            gameState.level++;
+                            gameState.bubbleSpeed += 0.2;
+                            gameState.timeLeft += 10;
+                            showGameNotice('LEVEL UP!');
+                        }
+                        createFloatingText(`+${pointsGained}`, bubbleRect.left, bubbleRect.top, '#4ecdc4');
+                    } else {
+                        flashScreen(false);
+                        gameState.combo = 0;
+                        gameState.timeLeft = Math.max(0, gameState.timeLeft - 3);
+                        createExplosion(bubble.element, '#ff6b6b');
+                        createFloatingText('-3s', bubbleRect.left, bubbleRect.top, '#ff6b6b');
+                    }
+                    break;
+                case 'time':
+                    gameState.timeLeft += 5;
+                    createExplosion(bubble.element, '#00c6ff');
+                    createFloatingText('+5s', bubbleRect.left, bubbleRect.top, '#00c6ff');
+                    break;
+                case 'penalty':
+                    gameState.timeLeft = Math.max(0, gameState.timeLeft - 5);
+                    createExplosion(bubble.element, '#8B0000');
+                    createFloatingText('-5s', bubbleRect.left, bubbleRect.top, '#ff6b6b');
+                    break;
+                case 'bomb':
+                    createExplosion(bubble.element, '#666');
+                    // Explode nearby bubbles
+                    for (let i = gameState.bubbles.length - 1; i >= 0; i--) {
+                        if (i === bubbleIndex || gameState.bubbles[i].element.dataset.hit) continue;
+                        const otherBubble = gameState.bubbles[i];
+                        const dist = Math.hypot((bubble.x + bubble.radius) - (otherBubble.x + otherBubble.radius), (bubble.y + bubble.radius) - (otherBubble.y + otherBubble.radius));
+                        if (dist < 200) { // Bomb radius
+                             hitBubble(otherBubble, i);
+                        }
+                    }
+                    break;
             }
             
             bubble.element.remove();
@@ -568,14 +581,12 @@
         function updateCannonAiming(mouseX, mouseY) {
             const cannonBarrel = document.getElementById('cannonBarrel');
             if (!cannonBarrel) return;
-            
             const pivot = getCannonPivot();
             const angle = Math.atan2(mouseY - pivot.y, mouseX - pivot.x) + Math.PI / 2;
-            const degrees = angle * (180 / Math.PI);
-            cannonBarrel.style.transform = `translateX(-50%) rotate(${degrees}deg)`;
+            cannonBarrel.style.transform = `translateX(-50%) rotate(${angle * (180/Math.PI)}deg)`;
             
             const crosshair = document.getElementById('crosshair');
-            if (crosshair) {
+            if(crosshair) {
                 crosshair.style.left = mouseX - 15 + 'px';
                 crosshair.style.top = mouseY - 15 + 'px';
             }
@@ -592,7 +603,7 @@
             explosion.style.display = 'flex';
             explosion.style.alignItems = 'center';
             explosion.style.justifyContent = 'center';
-            document.getElementById('gameArea').appendChild(explosion);
+            gameArea.appendChild(explosion);
             setTimeout(() => explosion.remove(), 600);
         }
 
@@ -608,13 +619,31 @@
                 setTimeout(() => particle.remove(), 2000);
             }
         }
+        
+        function showGameNotice(text) {
+            const notice = document.createElement('div');
+            notice.className = 'game-notice';
+            notice.textContent = text;
+            gameArea.appendChild(notice);
+            setTimeout(() => notice.remove(), 1000);
+        }
 
-        function showCombo() {
-            const combo = document.createElement('div');
-            combo.className = 'combo';
-            combo.textContent = `${gameState.combo}x COMBO!`;
-            document.getElementById('gameArea').appendChild(combo);
-            setTimeout(() => combo.remove(), 1000);
+        function createFloatingText(text, x, y, color) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.textContent = text;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.color = color;
+            gameArea.appendChild(el);
+            setTimeout(() => el.remove(), 1500);
+        }
+
+        function flashScreen(isCorrect) {
+            const target = gameContainer;
+            const className = isCorrect ? 'flash-correct' : 'flash-incorrect';
+            target.classList.add(className);
+            setTimeout(() => target.classList.remove(className), 300);
         }
 
         function updateBubbles() {
@@ -633,7 +662,7 @@
         function updateUI() {
             document.getElementById('score').textContent = gameState.score;
             document.getElementById('level').textContent = gameState.level;
-            document.getElementById('time').textContent = gameState.timeLeft;
+            document.getElementById('time').textContent = Math.max(0, gameState.timeLeft);
         }
 
         function gameLoop() {
@@ -649,10 +678,7 @@
         function startTimer() {
             if (gameTimer) clearInterval(gameTimer);
             gameTimer = setInterval(() => {
-                if (!gameState.gameRunning) {
-                    clearInterval(gameTimer);
-                    return;
-                }
+                if (!gameState.gameRunning) return clearInterval(gameTimer);
                 gameState.timeLeft--;
                 updateUI();
                 if (gameState.timeLeft <= 0) {
@@ -671,36 +697,27 @@
             document.getElementById('finalLevel').textContent = gameState.level;
             document.getElementById('gameOver').style.display = 'block';
 
-            const gameArea = document.getElementById('gameArea');
             gameArea.removeEventListener('mousemove', handleMouseMove);
             gameArea.removeEventListener('click', handleMouseClick);
             gameArea.removeEventListener('touchstart', handleTouch);
             gameArea.style.cursor = 'default';
-
             document.getElementById('crosshair').style.display = 'none';
         }
         
-        // --- Event Handlers ---
-        function handleMouseMove(e) {
-            if (!gameState.gameRunning) return;
-            updateCannonAiming(e.clientX, e.clientY);
-        }
-
-        function handleMouseClick(e) {
-            if (!gameState.gameRunning) return;
-            createProjectile(e.clientX, e.clientY);
-        }
-        
-        // Mobile "tap to shoot" handler
+        function handleMouseMove(e) { if (gameState.gameRunning) updateCannonAiming(e.clientX, e.clientY); }
+        function handleMouseClick(e) { if (gameState.gameRunning) createProjectile(e.clientX, e.clientY); }
         function handleTouch(e) {
             e.preventDefault();
             if (!gameState.gameRunning || !e.touches[0]) return;
             const touch = e.touches[0];
-            updateCannonAiming(touch.clientX, touch.clientY); // Aim first
-            createProjectile(touch.clientX, touch.clientY);   // Then fire
+            updateCannonAiming(touch.clientX, touch.clientY);
+            createProjectile(touch.clientX, touch.clientY);
         }
 
         function startGame() {
+            mainMenu.style.display = 'none';
+            gameContainer.style.display = 'flex';
+            
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             if (gameTimer) clearInterval(gameTimer);
 
@@ -710,16 +727,10 @@
                 combo: 0, bubbleSpeed: 1
             };
             
-            const gameArea = document.getElementById('gameArea');
-            gameArea.innerHTML = `
-                <div class="cannon-barrel" id="cannonBarrel"></div>
-                <div class="cannon" id="cannon"></div>
-            `;
-            
+            gameArea.innerHTML = `<div class="cannon-barrel" id="cannonBarrel"></div><div class="cannon" id="cannon"></div>`;
             document.getElementById('gameOver').style.display = 'none';
             document.getElementById('crosshair').style.display = 'block';
 
-            // Add all event listeners
             gameArea.addEventListener('mousemove', handleMouseMove);
             gameArea.addEventListener('click', handleMouseClick);
             gameArea.addEventListener('touchstart', handleTouch, { passive: false });
@@ -727,17 +738,18 @@
 
             document.getElementById('equation').textContent = generateEquation();
             updateUI();
-            
             startTimer();
             gameLoop();
         }
+        
+        startGameBtn.addEventListener('click', startGame);
 
-        // Start the game when page loads
-        window.onload = startGame;
-        window.onresize = () => {
-             // This could be used to readjust elements on resize if needed,
-             // but CSS handles most of it.
-        };
+        playAgainBtn.addEventListener('click', () => {
+            document.getElementById('gameOver').style.display = 'none';
+            gameContainer.style.display = 'none';
+            mainMenu.style.display = 'block';
+        });
+
     </script>
 </body>
 </html>
